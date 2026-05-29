@@ -240,7 +240,6 @@ class EmbedderFactory:
           engine: "fastembed" | "ollama" | "openai"
           **kwargs: 传递给具体后端的参数 (model_name, api_key 等)
         """
-        global _instances
         cache_key = f"{engine}:{hash(frozenset(kwargs.items()))}"
         if cache_key in _instances:
             return _instances[cache_key]

@@ -10,8 +10,8 @@ from pathlib import Path
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from agent.nexus_core import NexusCore
-from agent.nexus_utils import content_hash, segment_fts, empty_scores
+from src.nexus_core import NexusCore
+from src.nexus_utils import content_hash, segment_fts, empty_scores
 
 
 def test_content_hash():

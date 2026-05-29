@@ -2,9 +2,8 @@
 
 from .nexus_core import NexusCore
 from .nexus_drive import NexusDrive
-from .nexus_extract import NexusExtractor
-from .nexus_search import NexusSearch
+from .nexus_search import EnhancedSearch
 
 __version__ = "1.0.0"
 __author__ = "chuf"
-__all__ = ["NexusCore", "NexusDrive", "NexusExtractor", "NexusSearch"]
+__all__ = ["NexusCore", "NexusDrive", "EnhancedSearch"]
