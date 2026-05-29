@@ -1,70 +1,52 @@
+[![CI](https://github.com/chuf-China/nexus-memory/actions/workflows/python-package.yml/badge.svg)](https://github.com/chuf-China/nexus-memory/actions/workflows/python-package.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/chuf-China/nexus-memory/tree/main/tests)
+
+[中文版](README_CN.md)
+
 # Nexus Memory System
 
-一个可植入任何 AI Agent 的跨会话持久化记忆系统。
+A cross-session persistent memory system for AI Agents. Plug-and-play design, compatible with any Agent framework.
 
-## 核心特性
+## Key Features
 
-- **三层知识架构**：Memory（短期）→ Session（中期）→ Nexus（长期）
-- **六域评分系统**：新鲜度/重要性/访问频率/关联度/置信度/反馈分
-- **混合检索引擎**：FTS5 全文检索（20ms）+ 向量语义检索 + 图关系检索
-- **安全防御系统**：30+ 威胁模式检测，三级作用域控制
-- **自进化机制**：知识自动归类、免疫规则、审计日志
+- **3-Layer Knowledge Architecture**: Memory (short-term) → Session (mid-term) → Nexus (long-term)
+- **6-Domain Scoring System**: Freshness / Importance / Frequency / Relevance / Confidence / Feedback
+- **Hybrid Search Engine**: FTS5 full-text (20ms) + Vector semantic + Graph relationship
+- **Security Defense**: 30+ threat pattern detection, 3-tier scope control
+- **Self-Evolution**: Auto-classification, immune rules, audit logging
 
-## 性能
+## Performance
 
-- 检索响应：20ms（原版 90s + LLM 调用）
-- 提速倍数：4500x
-- 成本：零 LLM 调用
+| Metric | Value |
+|--------|-------|
+| Search Latency | 20ms |
+| Speedup | 4500x vs LLM-based |
+| LLM Dependency | Zero |
+| Runtime | Pure local |
 
-## 快速开始
+## Quick Start
 
 ```python
 from src.nexus_core import NexusCore
 
-# 初始化
+# Initialize
 nexus = NexusCore("nexus.db")
 
-# 写入知识
-nexus.write("用户偏好简洁回答", source="conversation", confidence=0.9)
+# Write knowledge
+nexus.write("User prefers concise answers", source="conversation", confidence=0.9)
 
-# 检索知识
-results = nexus.search("用户喜欢什么样的回答风格", limit=5)
+# Search knowledge
+results = nexus.search("What answer style does the user prefer?", limit=5)
 
-# 获取系统提示词块（注入到 Agent 的 system prompt）
+# Inject into Agent's system prompt
 prompt_block = nexus.system_prompt_block()
 ```
 
-## 目录结构
+## Integrate Into Your Agent
 
-```
-nexus-memory/
-├── src/
-│   ├── nexus_core.py        # 核心引擎（2448行）
-│   ├── nexus_drive.py       # 数据持久化层
-│   ├── nexus_extract.py     # 知识提取器
-│   ├── nexus_search.py      # 混合检索引擎
-│   ├── nexus_embedder.py    # 向量嵌入
-│   ├── nexus_hnsw.py        # HNSW 索引
-│   ├── nexus_graph.py       # 图关系存储
-│   ├── nexus_belief.py      # 信念网络
-│   ├── nexus_constitution.py # 安全防御系统
-│   ├── nexus_evolve.py      # 自进化机制
-│   ├── nexus_miner.py       # 知识挖掘
-│   ├── nexus_cli.py         # 命令行工具
-│   ├── nexus_local.py       # 本地存储
-│   └── nexus_utils.py       # 工具函数
-├── tests/
-│   ├── test_nexus_core.py   # 核心测试
-│   └── test_nexus_benchmark.py # 性能基准
-├── docs/
-│   └── architecture.md      # 架构文档
-├── setup.py                 # 安装配置
-└── README.md                # 本文件
-```
-
-## 集成到你的 Agent
-
-### 1. 作为独立模块使用
+### As Standalone Module
 
 ```python
 from src.nexus_core import NexusCore
@@ -74,39 +56,38 @@ class YourAgent:
         self.memory = NexusCore("agent_memory.db")
     
     def chat(self, user_input):
-        # 检索相关记忆
+        # Retrieve relevant memories
         context = self.memory.search(user_input, limit=3)
         
-        # 构建 prompt
-        prompt = f"相关记忆：{context}\n用户输入：{user_input}"
+        # Build prompt
+        prompt = f"Related memories: {context}\nUser input: {user_input}"
         
-        # 调用 LLM
+        # Call LLM
         response = self.llm.generate(prompt)
         
-        # 保存对话到记忆
-        self.memory.write(f"用户：{user_input}\n助手：{response}", 
+        # Save conversation to memory
+        self.memory.write(f"User: {user_input}\nAssistant: {response}", 
                          source="conversation")
         
         return response
 ```
 
-### 2. 注入到 System Prompt
+### Inject into System Prompt
 
 ```python
-# 在 Agent 的 system prompt 中注入记忆
 system_prompt = f"""
-你是智能助手。
+You are an intelligent assistant.
 
 {nexus.system_prompt_block()}
 
-请根据以上记忆信息回答用户问题。
+Please answer based on the above memory information.
 """
 ```
 
-### 3. 使用 Hooks 自动管理
+### Lifecycle Hooks
 
 ```python
-# 注册生命周期钩子
+# Register hooks for automatic memory management
 nexus.register_hook("pre_llm_call", lambda ctx: ctx.update({
     "alerts": nexus.get_alerts(),
     "temporal": nexus.search_temporal(ctx["query"]),
@@ -119,44 +100,86 @@ nexus.register_hook("session_end", lambda ctx: {
 })
 ```
 
-## 安全防御
+## Directory Structure
 
-Nexus 内置 30+ 威胁模式检测：
+```
+nexus-memory/
+├── src/
+│   ├── nexus_core.py        # Core engine (2448 lines)
+│   ├── nexus_drive.py       # Data persistence layer
+│   ├── nexus_extract.py     # Knowledge extractor
+│   ├── nexus_search.py      # Hybrid search engine
+│   ├── nexus_embedder.py    # Vector embedding
+│   ├── nexus_hnsw.py        # HNSW index
+│   ├── nexus_graph.py       # Graph relationship storage
+│   ├── nexus_belief.py      # Belief network
+│   ├── nexus_constitution.py # Security defense system
+│   ├── nexus_evolve.py      # Self-evolution mechanism
+│   ├── nexus_miner.py       # Knowledge mining
+│   ├── nexus_cli.py         # CLI tool
+│   ├── nexus_local.py       # Local storage
+│   └── nexus_utils.py       # Utility functions
+├── tests/
+│   ├── test_nexus_core.py   # Core tests
+│   └── test_nexus_benchmark.py # Performance benchmarks
+├── docs/
+│   └── architecture.md      # Architecture documentation
+├── setup.py                 # Installation config
+└── README.md                # This file
+```
 
-- **注入攻击**：Prompt injection、角色劫持、系统提示泄露
-- **数据外泄**：编码绕过、隐蔽通道、C2 通信
-- **反取证**：日志篡改、时间戳伪造、证据销毁
+## Security Defense
 
-三级作用域控制：
-- `all`：所有知识都扫描
-- `context`：仅扫描上下文相关知识
-- `strict`：严格模式，最高安全级别
+Nexus includes 30+ threat pattern detection:
 
-## 性能基准
+- **Injection**: Prompt injection, role hijacking, system prompt leakage
+- **Exfiltration**: Encoding bypass, covert channels, C2 communication
+- **Anti-forensics**: Log tampering, timestamp forgery, evidence destruction
 
-| 操作 | 响应时间 | 说明 |
-|------|---------|------|
-| FTS5 检索 | 20ms | SQLite 全文索引 |
-| 向量检索 | 50ms | HNSW 近似最近邻 |
-| 图关系查询 | 10ms | 邻接表遍历 |
-| 写入知识 | 5ms | WAL 模式批量写入 |
-| 知识整合 | 100ms | 合并去重 + 评分更新 |
+3-tier scope control:
+- `all`: Scan all knowledge
+- `context`: Scan only context-related knowledge
+- `strict`: Strict mode, highest security level
 
-## 依赖
+## Performance Benchmarks
+
+| Operation | Latency | Notes |
+|-----------|---------|-------|
+| FTS5 Search | 20ms | SQLite full-text index |
+| Vector Search | 50ms | HNSW approximate nearest neighbor |
+| Graph Query | 10ms | Adjacency list traversal |
+| Write Knowledge | 5ms | WAL mode batch write |
+| Consolidation | 100ms | Merge + dedup + score update |
+
+## Dependencies
 
 - Python 3.9+
-- SQLite 3.38+（FTS5 支持）
-- numpy（向量计算）
-- 无外部服务依赖，纯本地运行
+- SQLite 3.38+ (FTS5 support)
+- numpy (vector computation)
+- No external service dependencies, pure local execution
 
-## 许可证
+## Installation
+
+```bash
+git clone https://github.com/chuf-China/nexus-memory.git
+cd nexus-memory
+pip install -e .
+```
+
+## Run Tests
+
+```bash
+python -m pytest tests/
+```
+
+## License
 
 MIT License
 
-## 作者
+## Author
 
 chuf-China
 
-## 致谢
+## Acknowledgments
 
-基于 Hermes Agent 的记忆系统架构设计。
+Based on the memory system architecture design of [Hermes Agent](https://github.com/NousResearch/hermes-agent).

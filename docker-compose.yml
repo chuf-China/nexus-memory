@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  nexus:
+    build: .
+    container_name: nexus-memory
+    ports:
+      - "8080:8080"
+    volumes:
+      - nexus-data:/root/.hermes/data/nexus
+    environment:
+      - NEXUS_DB_PATH=/root/.hermes/data/nexus/nexus.db
+      - NEXUS_LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "from nexus.health import health_check; import sys; r=health_check(); sys.exit(0 if r.get('status')=='healthy' else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nexus-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    depends_on:
+      - nexus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nexus-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  nexus-data:
+  prometheus-data:
+  grafana-data:

@@ -1,0 +1,10 @@
+# Nexus Memory System - Python dependencies
+pydantic>=2.0
+sentence-transformers>=2.2
+networkx>=3.0
+python-louvain>=0.16
+mcp>=1.0
+fastembed>=0.3
+
+# Optional: vector search (requires C++ compiler for build)
+# hnswlib>=0.7

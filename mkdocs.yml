@@ -1,0 +1,17 @@
+site_name: Nexus Memory System
+site_description: Knowledge memory system for AI agents
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - Core Concepts: concepts.md
+  - API Reference: api.md
+  - Architecture: architecture.md
+  - Deployment: deployment.md
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed
