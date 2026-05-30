@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus-memory"
@@ -10,7 +10,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
 authors = [
-    {name = "chuf-China", email = "nexus-memory@example.com"},
+    {name = "chuf", email = "64515713+chuf-China@users.noreply.github.com"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -23,16 +23,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Database",
-    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-keywords = ["ai-agent", "memory", "persistent-memory", "llm", "knowledge-graph", "sqlite", "mcp"]
+keywords = ["ai-agent", "memory", "persistent-memory", "llm", "knowledge-graph", "sqlite", "mcp", "vector-search"]
 dependencies = [
     "numpy>=1.21.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/chuf-China/nexus-memory"
-Documentation = "https://github.com/chuf-China/nexus-memory#readme"
 Repository = "https://github.com/chuf-China/nexus-memory"
 Issues = "https://github.com/chuf-China/nexus-memory/issues"
 
@@ -40,4 +38,4 @@ Issues = "https://github.com/chuf-China/nexus-memory/issues"
 nexus-memory = "src.nexus_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["src*"]
+include = ["src*", "nexus*"]
