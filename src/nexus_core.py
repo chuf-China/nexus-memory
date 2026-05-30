@@ -482,6 +482,7 @@ class NexusCore:
                 model_response  TEXT,
                 knowledge_used  TEXT,    -- JSON array of {id, content, layer, score}
                 correction_of   TEXT,    -- if this interaction is a correction, link to prior interaction_log.id
+                event_time      TIMESTAMP,
                 created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)

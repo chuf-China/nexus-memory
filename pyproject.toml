@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "nexus-memory"
+version = "0.1.0"
+description = "Cross-session persistent memory for AI Agents. 4500x faster retrieval, zero LLM dependency."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "chuf-China", email = "nexus-memory@example.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = ["ai-agent", "memory", "persistent-memory", "llm", "knowledge-graph", "sqlite", "mcp"]
+dependencies = [
+    "numpy>=1.21.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/chuf-China/nexus-memory"
+Documentation = "https://github.com/chuf-China/nexus-memory#readme"
+Repository = "https://github.com/chuf-China/nexus-memory"
+Issues = "https://github.com/chuf-China/nexus-memory/issues"
+
+[project.scripts]
+nexus-memory = "src.nexus_cli:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
