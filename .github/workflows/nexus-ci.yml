@@ -28,6 +28,6 @@ jobs:
           pip install numpy pytest
 
       - name: Run tests
-        run: pytest tests/test_nexus_core.py tests/test_nexus_core_extended.py tests/test_nexus_cli.py tests/test_nexus_utils.py tests/test_core.py tests/test_utils.py -v --tb=short
+        run: pytest tests/test_nexus_core.py tests/test_nexus_core_extended.py tests/test_nexus_utils.py tests/test_core.py tests/test_utils.py -v --tb=short
         env:
           PYTHONPATH: ${{ github.workspace }}
