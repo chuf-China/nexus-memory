@@ -50,7 +50,7 @@ system_prompt = f"You are helpful.\n{nexus.system_prompt_block()}"
 ## Install
 
 ```bash
-pip install nexus-memory
+pip install nexus-agent-memory
 ```
 
 Or from source:

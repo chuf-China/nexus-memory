@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="nexus-memory",
+    name="nexus-agent-memory",
     version="1.0.0",
     description="A cross-session persistent memory system for AI Agents",
     long_description=open("README.md").read(),
