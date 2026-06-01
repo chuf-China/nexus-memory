@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus-agent-memory"
-version = "0.1.0"
-description = "Cross-session persistent memory for AI Agents. 4500x faster retrieval, zero LLM dependency."
+version = "0.2.0"
+description = "Cross-session persistent memory for AI Agents. Local-first, zero LLM dependency for core operations."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
@@ -24,9 +24,37 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Database",
 ]
-keywords = ["ai-agent", "memory", "persistent-memory", "llm", "knowledge-graph", "sqlite", "mcp", "vector-search"]
+keywords = ["ai-agent", "memory", "persistent-memory", "llm", "knowledge-graph", "sqlite", "vector-search"]
+
+# Core dependencies (required)
 dependencies = [
     "numpy>=1.21.0",
+    "click>=8.0",
+]
+
+# Optional dependencies
+[project.optional-dependencies]
+# Vector search support
+vector = [
+    "fastembed>=0.3",
+    "hnswlib>=0.7",
+]
+# LLM integration
+llm = [
+    "openai>=1.0",
+]
+# Full installation (all optional features)
+full = [
+    "fastembed>=0.3",
+    "hnswlib>=0.7",
+    "openai>=1.0",
+    "sentence-transformers>=2.2",
+]
+# Development dependencies
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "flake8>=6.0",
 ]
 
 [project.urls]
@@ -38,4 +66,14 @@ Issues = "https://github.com/chuf-China/nexus-memory/issues"
 nexus-memory = "src.nexus_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["src*", "nexus*"]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.flake8]
+max-line-length = 120
+exclude = [".git", "__pycache__", "build", "dist"]
