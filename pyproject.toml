@@ -43,12 +43,22 @@ vector = [
 llm = [
     "openai>=1.0",
 ]
+# REST API support
+api = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pydantic>=2.0",
+]
+
 # Full installation (all optional features)
 full = [
     "fastembed>=0.3",
     "hnswlib>=0.7",
     "openai>=1.0",
     "sentence-transformers>=2.2",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pydantic>=2.0",
 ]
 # Development dependencies
 dev = [
