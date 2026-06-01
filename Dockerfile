@@ -5,23 +5,22 @@ LABEL description="Nexus Knowledge Memory System"
 
 WORKDIR /app
 
-# Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-# Application code
-COPY . nexus/
+# Copy and install Python deps
+COPY pyproject.toml .
+COPY src/ src/
+RUN pip install --no-cache-dir -e ".[full]"
 
 # Data directory
-RUN mkdir -p /root/.hermes/data/nexus
+RUN mkdir -p /data
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+ENV NEXUS_DB_PATH=/data/nexus.db
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD python3 -c "from nexus.health import health_check; import sys; r=health_check(); sys.exit(0 if r.get('status')=='healthy' else 1)"
-
-# MCP server (stdio by default, SSE on --port)
 EXPOSE 8080
-CMD ["python3", "-m", "nexus.mcp_server"]
+CMD ["python", "-m", "src.api_server", "--host", "0.0.0.0", "--port", "8080"]
