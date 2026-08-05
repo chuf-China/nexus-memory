@@ -4,7 +4,7 @@
 
 Every AI coding agent faces the same problem: **they forget everything between sessions.** You explain your project architecture, your coding style, your preferences — and next session, it's gone.
 
-Three projects are trying to solve this. I benchmarked all of them.
+Three projects are trying to solve this. I evaluated all of them. (Note: only Nexus Memory is measured here — see Round 1 for the benchmark scope; third-party latency figures are not independently verified.)
 
 ## The Contenders
 
@@ -12,21 +12,21 @@ Three projects are trying to solve this. I benchmarked all of them.
 |---|---|---|---|
 | **Language** | Python | JavaScript (Node.js) | Python |
 | **Storage** | SQLite (local) | iii engine (local) | Qdrant/Redis (remote) |
-| **Install** | `pip install nexus-memory` | `npm install -g @agentmemory/agentmemory` | `pip install mem0ai` |
+| **Install** | `git clone + pip install -e .` | `npm install -g @agentmemory/agentmemory` | `pip install mem0ai` |
 | **Approach** | Embedded engine | MCP server + hooks | API service |
 | **License** | MIT | Unknown | Apache 2.0 |
 
 ## Round 1: Search Speed
 
-I tested retrieval latency with 10,000 knowledge entries:
+Measured on Nexus Memory's internal benchmark (50 queries, 50 seed entries, WSL2 — full suite in `tests/test_benchmark_v2.py`):
 
 | System | FTS5/Full-text | Vector | Combined |
 |--------|:-:|:-:|:-:|
-| **Nexus Memory** | **20ms** | **50ms** | **70ms** |
+| **Nexus Memory** | **10.9ms** avg (P95 28ms) | 23.4ms avg | — |
 | agentmemory | Not disclosed | Not disclosed | Not disclosed |
-| mem0 | N/A | ~100ms | ~150ms |
+| mem0 | N/A | ~100ms (unverified estimate) | ~150ms (unverified estimate) |
 
-Nexus wins on raw speed because it's pure SQLite — no network hop, no external DB.
+Nexus wins on raw speed because it's pure SQLite — no network hop, no external DB. Caveat: no head-to-head test with identical data was run; third-party figures are estimates from their public docs, not measured here.
 
 ## Round 2: Memory Quality
 
@@ -34,14 +34,14 @@ This is where it gets interesting.
 
 ### How knowledge is stored
 
-**Nexus Memory** uses SPO triplets (Subject-Predicate-Object):
+**Nexus Memory** stores entries with per-domain scores:
 ```
-Subject: user_coding_style
-Predicate: prefers
-Object: Python type hints
-Confidence: 0.92
-Source: conversation
-Superseded_by: null
+content: "User prefers Python type hints"
+domain_scores: {"workflow": 0.85, "behavior": 0.72, ...}
+layer: candidate          # instant → candidate → consolidated
+confidence: 0.70          # Observation 0.30-0.50 / Belief 0.50-0.85 / Fact 0.85+
+source_session_id: conversation
+status: active            # active / superseded / archived
 ```
 
 **agentmemory** stores knowledge inside the iii engine. The format is not publicly documented.
@@ -51,7 +51,7 @@ Superseded_by: null
 {"content": "User prefers Python type hints", "category": "coding", "importance": 8}
 ```
 
-**Winner: Nexus** — structured triplets enable precise conflict detection and version tracking.
+**Winner: Nexus** — structured domain scoring enables conflict detection and version tracking.
 
 ### How corrections work
 
@@ -73,8 +73,8 @@ When you say "that's wrong, I actually prefer Go":
 ### How knowledge evolves
 
 **Nexus Memory** has automatic lifecycle:
-- Observation (0.3-0.50) → raw signal, first seen
-- Belief (0.70-0.85) → confirmed 3+ times
+- Observation (0.30-0.50) → raw signal, first seen
+- Belief (0.50-0.85) → confirmed by repetition/feedback
 - Fact (0.85+) → high confidence, persistent
 - Auto-degrade: unused for 48h → -0.05
 - Auto-archive: confidence < 0.30
@@ -89,7 +89,7 @@ When you say "that's wrong, I actually prefer Go":
 
 | Feature | Nexus Memory | agentmemory | mem0 |
 |---------|:-:|:-:|:-:|
-| Prompt injection detection | ✅ 30+ patterns | ❌ | ❌ |
+| Prompt injection detection | ✅ 16 patterns (6 prompt injection + 7 SQLi + 3 XSS) | ❌ | ❌ |
 | Role hijacking detection | ✅ | ❌ | ❌ |
 | Scope control (3-tier) | ✅ all/context/strict | ❌ | ❌ |
 | Audit logging | ✅ | ❌ | ❌ |
@@ -136,10 +136,10 @@ When you say "that's wrong, I actually prefer Go":
 | Documentation | **agentmemory** |
 
 ### Choose Nexus Memory if:
-- You want the highest memory quality (SPO triplets, belief networks, auto-aging)
-- You need security (30+ threat patterns, scope control)
+- You want transparent memory quality (per-domain scoring, belief lifecycle, auto-aging)
+- You need security (16 threat patterns, context-scope scanning)
 - Your agent is Python-based
-- You want zero external dependencies
+- You want zero external services
 
 ### Choose agentmemory if:
 - You need broad agent support (20+ platforms)
@@ -157,7 +157,8 @@ When you say "that's wrong, I actually prefer Go":
 ## Try Nexus Memory
 
 ```bash
-pip install nexus-memory
+git clone https://github.com/chuf-China/nexus-memory
+cd nexus-memory && pip install -e .
 ```
 
 ```python

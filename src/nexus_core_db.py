@@ -6,21 +6,15 @@ Mixin for NexusCore. Do NOT import directly; use nexus_core.NexusCore instead.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-import re
 import sqlite3
-import hashlib
 import threading
-import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-from .security import scan_for_threats as _scan_for_threats
 
 try:
     from .nexus_local import get_client as _get_llm_client
@@ -29,15 +23,6 @@ except Exception:
     _HAS_LOCAL_LLM = False
     _get_llm_client = lambda: None
 
-from .nexus_utils import (
-    CONTENT_WHITESPACE,
-    content_hash,
-    empty_scores,
-    generate_summary,
-    incr_score,
-    max_domain,
-    segment_fts,
-)
 
 
 class DbMixin:

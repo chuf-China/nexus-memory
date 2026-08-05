@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """test_all_modules.py — 综合测试所有 Nexus 模块"""
 
-import json
 import os
 import sys
 import tempfile
@@ -194,7 +193,7 @@ class TestNexusLocal:
     """测试 nexus_local 模块"""
     
     def test_local_init(self):
-        from src.nexus_local import OllamaClient, get_client
+        from src.nexus_local import get_client
 
         assert callable(get_client)
 

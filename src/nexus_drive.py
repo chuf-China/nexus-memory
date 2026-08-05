@@ -13,13 +13,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

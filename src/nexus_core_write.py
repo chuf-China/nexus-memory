@@ -8,19 +8,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
-import sqlite3
-import hashlib
-import threading
-import time
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-from .security import scan_for_threats as _scan_for_threats
 
 try:
     from .nexus_local import get_client as _get_llm_client

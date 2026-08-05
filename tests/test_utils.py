@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.nexus_utils import (
-    normalize, content_hash, segment_fts, empty_scores,
+    normalize, empty_scores,
     generate_summary, incr_score, max_domain
 )
 

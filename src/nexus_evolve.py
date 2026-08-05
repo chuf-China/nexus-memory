@@ -21,12 +21,11 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import sqlite3
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -472,7 +471,6 @@ def evolve_on_write(content: str, user_id: str,
 
     if target["action"] == "contradict":
         # Mark conflict — let consolidator handle it
-        from .nexus_core import NexusCore
         conn.execute(
             "INSERT INTO knowledge_conflicts (knowledge_id_a, knowledge_id_b, "
             "conflict_type, description) "

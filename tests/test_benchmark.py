@@ -14,19 +14,16 @@
 每次运行使用独立的测试 DB，不影响生产数据。
 """
 
-import json
 import os
 import sys
 import tempfile
 import time
-import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.nexus_core import NexusCore
 from src.nexus_belief import BeliefEngine
-from src.nexus_evolve import evolve_on_write, find_merge_target
 from src.nexus_constitution import Constitution
 
 

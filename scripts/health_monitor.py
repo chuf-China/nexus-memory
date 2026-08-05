@@ -5,7 +5,6 @@
 异常时输出告警信息供 cron 通知。
 """
 
-import json
 import sys
 from pathlib import Path
 

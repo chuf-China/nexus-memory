@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))

@@ -1,6 +1,5 @@
 """Tests for nexus_utils module."""
 
-import pytest
 from src.nexus_utils import (
     normalize,
     content_hash,

@@ -1,4 +1,4 @@
-Title: I built a persistent memory system for AI agents that runs 4500x faster than LLM-based retrieval
+Title: I built a persistent memory system for AI agents with sub-10ms local search
 
 Hey r/LocalLLaMA,
 
@@ -8,27 +8,28 @@ So I built **Nexus Memory** — a Python-native persistent memory engine for AI 
 
 **What makes it different:**
 
-- **20ms search** — pure SQLite + FTS5, no external services
+- **Sub-10ms search** — pure SQLite + FTS5, no external services (measured 3.5ms avg FTS5, 50-query benchmark)
 - **3-tier knowledge architecture** — Observation → Belief → Fact, with automatic promotion/degradation
-- **SPO triplets** — facts stored as Subject-Predicate-Object, not flat text
-- **Smart corrections** — when you correct the agent, old knowledge degrades AND new knowledge promotes (natural淘汰, not a growing correction list)
-- **30+ security patterns** — detects prompt injection, role hijacking, data exfiltration
-- **Zero LLM dependency** — all retrieval is local, no API calls
+- **Structured scoring** — every entry carries per-domain scores (identity/workflow/behavior/strategy/rule/raw_fact), not flat text
+- **Smart corrections** — when you correct the agent, old knowledge degrades (confidence -0.30) AND new knowledge promotes (natural淘汰, not a growing correction list)
+- **16 security patterns** — prompt injection, SQL injection, XSS detection, with context-scope scanning on the system prompt read path
+- **Zero external services** — retrieval is fully local; fastembed/Ollama are optional add-ons for semantic search
 
 **Quick comparison with agentmemory:**
 
 | | Nexus Memory | agentmemory |
 |---|---|---|
-| Search latency | 20ms | Unknown |
-| Knowledge format | SPO triplets | Black box (iii engine) |
-| Correction handling | Belief degradation + SPO conflict | Unknown |
-| Security | 30+ patterns | None |
+| Search latency | 3.5ms (measured, 50 queries) | Unknown |
+| Knowledge format | Structured entries + domain scores | Black box (iii engine) |
+| Correction handling | Belief degradation + conflict detection | Unknown |
+| Security | 16 patterns (prompt injection/SQLi/XSS) | None |
 | Language | Python | JavaScript |
 
 agentmemory has broader agent support (20+ platforms) and better marketing. But if you care about memory quality and transparency, give Nexus a try.
 
 ```bash
-pip install nexus-memory
+git clone https://github.com/chuf-China/nexus-memory
+cd nexus-memory && pip install -e .
 ```
 
 GitHub: https://github.com/chuf-China/nexus-memory

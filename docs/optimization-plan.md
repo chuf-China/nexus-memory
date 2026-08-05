@@ -291,16 +291,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 3-layer knowledge architecture (Memory → Session → Nexus)
 - 6-domain scoring system (Freshness/Importance/Frequency/Relevance/Confidence/Feedback)
 - Hybrid search engine (FTS5 + Vector + Graph)
-- 30+ threat pattern detection with 3-tier scope control
+- Threat pattern detection with 3-tier scope control (16 类模式: 6 提示注入 + 7 SQLi + 3 XSS)
 - Self-evolution mechanism with auto-classification and immune rules
 - CLI tool for direct interaction
 - Comprehensive test suite
 - Bilingual documentation (English + Chinese)
 
 ### Performance
-- Search latency: 20ms (FTS5), 50ms (Vector), 10ms (Graph)
-- 4500x speedup vs LLM-based solutions
-- Zero external service dependencies
+- Search latency: 10.9ms avg FTS5 (50 查询实测, P95 28ms); 稳态 3.5ms; 向量 23.4ms; 图 8.6ms; 时间感知 19.7ms
+- Zero external service dependencies (检索纯本地, 无 LLM API 调用)
 
 ### Security
 - Prompt injection detection

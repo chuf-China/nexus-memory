@@ -34,12 +34,10 @@ Nexus 默认将所有知识视为"事实"。Belief Network 引入三级认知状
 
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
-import time
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

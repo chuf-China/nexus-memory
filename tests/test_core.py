@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """test_nexus_core.py — NexusCore单元测试"""
 
-import json
 import os
 import sys
 import tempfile

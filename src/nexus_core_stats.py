@@ -8,15 +8,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 import sqlite3
 import hashlib
-import threading
-import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
