@@ -6,7 +6,7 @@
   embedder: ollama    (nomic-embed-text, 需本地 Ollama)
 
 用法:
-  from agent.nexus_embedder import EmbedderFactory
+  from .nexus_embedder import EmbedderFactory
   embedder = EmbedderFactory.create("fastembed")
   vec = embedder.embed("文本")
 """
@@ -123,7 +123,7 @@ class OllamaEmbedder(BaseEmbedder):
 
     def _load(self):
         try:
-            from agent.nexus_local import OllamaClient
+            from .nexus_local import OllamaClient
             self._client = OllamaClient(
                 base_url=self.base_url,
                 embed_model=self.model_name,

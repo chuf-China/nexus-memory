@@ -96,7 +96,7 @@ class WriteMixin:
 
             # Belief reinforcement
             try:
-                from agent.nexus_belief import BeliefEngine
+                from .nexus_belief import BeliefEngine
                 BeliefEngine(conn).on_encounter(row["id"])
             except Exception:
                 pass
@@ -109,9 +109,9 @@ class WriteMixin:
         # ── Write-time merge (knowledge evolution) ──────────────
         if not skip_conflict_detection:
             try:
-                from agent.nexus_evolve import evolve_on_write
+                from .nexus_evolve import evolve_on_write
                 try:
-                    from agent.nexus_embedder import get_embedder
+                    from .nexus_embedder import get_embedder
                     _embedder = get_embedder()
                 except Exception:
                     _embedder = None
@@ -171,7 +171,7 @@ class WriteMixin:
         # ── Entity graph linking (optional, non-blocking) ──
         try:
             if len(content) > 20:  # 短内容没必要建图
-                from agent.nexus_graph import EntityGraph
+                from .nexus_graph import EntityGraph
                 eg = EntityGraph(conn)
                 eg.extract_and_link(new_id, content)
         except Exception:
@@ -185,7 +185,7 @@ class WriteMixin:
     def _init_belief(self, knowledge_id: int, initial_confidence: float = 0.40) -> None:
         """Initialize belief record for a new knowledge entry (non-blocking)."""
         try:
-            from agent.nexus_belief import BeliefEngine
+            from .nexus_belief import BeliefEngine
             be = BeliefEngine(self._conn())
             be.init_belief(knowledge_id, initial_confidence)
         except Exception:
@@ -205,7 +205,7 @@ class WriteMixin:
 
         # 1. Embedding (for semantic search) — fastembed primary, Ollama fallback
         try:
-            from agent.nexus_embedder import get_embedder
+            from .nexus_embedder import get_embedder
             embedder = get_embedder()
             if embedder.available:
                 vec = embedder.embed(content)
@@ -279,7 +279,7 @@ class WriteMixin:
 
         # Primary: fastembed
         try:
-            from agent.nexus_embedder import get_embedder
+            from .nexus_embedder import get_embedder
             embedder = get_embedder()
             if embedder.available:
                 q_embed = embedder.embed(query)
@@ -302,7 +302,7 @@ class WriteMixin:
 
         # ── HNSW 加速的近似最近邻搜索 ────────────────
         try:
-            from agent.nexus_hnsw import HNSWIndex
+            from .nexus_hnsw import HNSWIndex
             hnsw = HNSWIndex(self._conn(), dim=embed_dim)
             hnsw.build()
             if hnsw.available:
@@ -554,16 +554,16 @@ class WriteMixin:
         Condition is the applicability context (e.g. '震荡市场', '趋势市场').
         """
         results = []
-        entity_match = NexusCore._ENTITY_RE.search(content)
+        entity_match = WriteMixin._ENTITY_RE.search(content)
         entity = entity_match.group(1).strip() if entity_match else None
         if not entity:
             return results
 
         # Extract condition from the same entry
-        cond_match = NexusCore._CONDITION_RE.search(content)
+        cond_match = WriteMixin._CONDITION_RE.search(content)
         condition = cond_match.group(1).strip() if cond_match else ""
 
-        for m in NexusCore._METRIC_RE.finditer(content):
+        for m in WriteMixin._METRIC_RE.finditer(content):
             metric = m.group(1)
             try:
                 val = float(m.group(2))
@@ -652,7 +652,7 @@ class WriteMixin:
 
     def _validate_by_layer(self, user_id: str = "default") -> Dict[str, Any]:
         """Cross-validate candidate & consolidated entries for silent conflicts.
-        
+
         Called during sleep-time compute. Returns conflict summary.
         """
         conn = self._conn()

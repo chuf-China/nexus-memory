@@ -101,7 +101,7 @@ class AuditMixin:
     def _init_constitution(self, conn):
         """Initialize constitutional governance tables (idempotent)."""
         try:
-            from agent.nexus_constitution import Constitution
+            from .nexus_constitution import Constitution
             Constitution(conn)
         except Exception:
             pass
@@ -174,7 +174,7 @@ class AuditMixin:
         # 7. Link in entity graph
         try:
             if len(new_content) > 20:
-                from agent.nexus_graph import EntityGraph
+                from .nexus_graph import EntityGraph
                 eg = EntityGraph(conn)
                 eg.extract_and_link(new_id, new_content)
         except Exception:

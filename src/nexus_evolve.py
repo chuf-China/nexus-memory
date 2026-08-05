@@ -11,7 +11,7 @@
   new          → 无合适目标，正常创建
 
 用法:
-  from agent.nexus_evolve import find_merge_target
+  from .nexus_evolve import find_merge_target
   target = find_merge_target(content, user_id, conn)
   if target["action"] == "fuzzy_dup":
       # 更新现有条目
@@ -237,10 +237,6 @@ def find_merge_target(content: str, user_id: str,
         old = row["content"]
         sim = _jaccard_similarity(content, old)
 
-        try:
-            ds = json.loads(row["domain_scores"]) if row["domain_scores"] != "{}" else {}
-        except Exception:
-            ds = {}
         old_domain = _infer_domain(old)
 
         # Same domain?
@@ -254,7 +250,6 @@ def find_merge_target(content: str, user_id: str,
         # Check contradiction
         old_neg = _has_negation(old)
         if same_domain and sim > 0.4:
-            old_major = " ".join(_tokenize(old))
             new_major = " ".join(_tokenize(content))
 
             # Contradiction: same topic, opposite polarity
@@ -429,7 +424,7 @@ def evolve_on_write(content: str, user_id: str,
         )
         # Update FTS
         try:
-            from agent.nexus_core import _segment_fts
+            from .nexus_core import _segment_fts
             seg = _segment_fts(merged)
             conn.execute(
                 "INSERT INTO knowledge_fts(knowledge_fts, rowid, content) "
@@ -458,7 +453,7 @@ def evolve_on_write(content: str, user_id: str,
         )
         # Update FTS
         try:
-            from agent.nexus_core import _segment_fts
+            from .nexus_core import _segment_fts
             seg = _segment_fts(merged)
             conn.execute(
                 "INSERT INTO knowledge_fts(knowledge_fts, rowid, content) "
@@ -477,7 +472,7 @@ def evolve_on_write(content: str, user_id: str,
 
     if target["action"] == "contradict":
         # Mark conflict — let consolidator handle it
-        from agent.nexus_core import NexusCore
+        from .nexus_core import NexusCore
         conn.execute(
             "INSERT INTO knowledge_conflicts (knowledge_id_a, knowledge_id_b, "
             "conflict_type, description) "

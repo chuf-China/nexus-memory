@@ -6,7 +6,7 @@
 - 图遍历（WITH RECURSIVE CTE）
 
 用法:
-  from agent.nexus_graph import EntityGraph
+  from .nexus_graph import EntityGraph
   g = EntityGraph(conn)  # reuse nexus.db connection
   g.extract_and_link(entry_id=1, content="用户偏好简洁回答")
   related = g.traverse(entity="简洁回答", max_depth=2)
@@ -137,7 +137,7 @@ def extract_entity_pairs(text: str) -> List[Tuple[str, str]]:
         if key not in seen and len(e) >= 2:
             seen.add(key)
             deduped.append(e)
-    
+
     pairs = []
     for i in range(len(deduped)):
         for j in range(i + 1, len(deduped)):
@@ -224,7 +224,6 @@ class EntityGraph:
             return  # 单实体无法建关系
 
         pairs = extract_entity_pairs(content)
-        now = time.time()
 
         for a, b in pairs:
             rel = _infer_relation(content, a, b)

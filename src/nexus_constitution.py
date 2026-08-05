@@ -18,7 +18,7 @@ Animesis 四层治理的实用简化版，聚焦 Nexus 实际场景：
    - 合规删除（Right to be forgotten）
 
 用法:
-  from agent.nexus_constitution import Constitution
+  from .nexus_constitution import Constitution
   c = Constitution(conn)
   c.check_rule('write', domain='identity')  # 检查是否允许写入
   c.on_model_switch('deepseek-v4', 'gemini-3')  # 模型切换保护
@@ -170,7 +170,7 @@ class Constitution:
         # 1. 快照当前 domain_accuracy（从 miner）
         domain_accuracy = {}
         try:
-            from agent.nexus_miner import NexusMiner
+            from .nexus_miner import NexusMiner
             miner = NexusMiner()
             report = miner.mine_all()
             if "self_model" in report:
@@ -234,7 +234,7 @@ class Constitution:
         # 获取当前准确率
         current_accuracy = {}
         try:
-            from agent.nexus_miner import NexusMiner
+            from .nexus_miner import NexusMiner
             miner = NexusMiner()
             report = miner.mine_all()
             if "self_model" in report:

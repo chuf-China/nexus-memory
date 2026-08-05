@@ -59,53 +59,53 @@ def cli(ctx: click.Context, db: Optional[str]):
 def status(ctx: click.Context):
     """Show database statistics."""
     db_path = ctx.obj["db_path"]
-    
+
     if not db_path.exists():
         click.echo(f"Database: {db_path}")
         click.echo("Status: NOT FOUND")
         click.echo("\nCreate a database by writing some knowledge:")
         click.echo('  nexus-memory write "Your fact here"')
         return
-    
+
     conn = get_connection(db_path)
     try:
         cursor = conn.cursor()
-        
+
         # Count knowledge entries
         cursor.execute("SELECT COUNT(*) FROM knowledge")
         total_count = cursor.fetchone()[0]
-        
+
         # Count by source
         cursor.execute("SELECT source, COUNT(*) FROM knowledge GROUP BY source")
         source_counts = dict(cursor.fetchall())
-        
+
         # Count by domain
         cursor.execute("SELECT domain, COUNT(*) FROM knowledge GROUP BY domain")
         domain_counts = dict(cursor.fetchall())
-        
+
         # Database size
         db_size = db_path.stat().st_size
         db_size_mb = db_size / (1024 * 1024)
-        
+
         # Last write time
         cursor.execute("SELECT MAX(created_at) FROM knowledge")
         last_write = cursor.fetchone()[0]
-        
+
         click.echo(f"Database: {db_path}")
         click.echo(f"Size: {db_size_mb:.2f} MB")
         click.echo(f"Total entries: {total_count}")
         click.echo(f"Last write: {last_write}")
-        
+
         if source_counts:
             click.echo("\nBy source:")
             for source, count in sorted(source_counts.items(), key=lambda x: -x[1]):
                 click.echo(f"  {source}: {count}")
-        
+
         if domain_counts:
             click.echo("\nBy domain:")
             for domain, count in sorted(domain_counts.items(), key=lambda x: -x[1]):
                 click.echo(f"  {domain}: {count}")
-    
+
     finally:
         conn.close()
 
@@ -118,25 +118,25 @@ def status(ctx: click.Context):
 def search(ctx: click.Context, query: str, limit: int, domain: Optional[str]):
     """Search knowledge base."""
     db_path = ctx.obj["db_path"]
-    
+
     # Import NexusCore
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from src.nexus_core import NexusCore
-    
+
     nexus = NexusCore(str(db_path))
     results = nexus.search(query, limit=limit, domain_filter=domain)
-    
+
     if not results:
         click.echo("No results found.")
         return
-    
+
     click.echo(f"Found {len(results)} results:\n")
     for i, result in enumerate(results, 1):
         content = result.get("content", "")
         score = result.get("score", 0)
         source = result.get("source", "unknown")
         domain = result.get("domain", "general")
-        
+
         click.echo(f"{i}. [{domain}] {content[:100]}...")
         click.echo(f"   Score: {score:.3f} | Source: {source}")
         click.echo()
@@ -149,23 +149,23 @@ def export(ctx: click.Context, output: str):
     """Export knowledge to JSON."""
     db_path = ctx.obj["db_path"]
     conn = get_connection(db_path)
-    
+
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM knowledge")
         columns = [description[0] for description in cursor.description]
         rows = cursor.fetchall()
-        
+
         data = []
         for row in rows:
             entry = dict(zip(columns, row))
             data.append(entry)
-        
+
         with open(output, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
-        
+
         click.echo(f"Exported {len(data)} entries to {output}")
-    
+
     finally:
         conn.close()
 
@@ -179,14 +179,14 @@ def export(ctx: click.Context, output: str):
 def write(ctx: click.Context, content: str, source: str, confidence: float, domain: str):
     """Write knowledge to the database."""
     db_path = ctx.obj["db_path"]
-    
+
     # Import NexusCore
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from src.nexus_core import NexusCore
-    
+
     nexus = NexusCore(str(db_path))
     nexus.write(content, source=source, confidence=confidence, domain=domain)
-    
+
     click.echo(f"✓ Written to {domain}: {content[:50]}...")
 
 
@@ -196,36 +196,36 @@ def write(ctx: click.Context, content: str, source: str, confidence: float, doma
 def benchmark(ctx: click.Context, iterations: int):
     """Run performance benchmark."""
     db_path = ctx.obj["db_path"]
-    
+
     # Import NexusCore
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from src.nexus_core import NexusCore
-    
+
     click.echo(f"Running benchmark with {iterations} iterations...")
-    
+
     nexus = NexusCore(str(db_path))
-    
+
     # Write benchmark
     write_times = []
     for i in range(iterations):
         start = time.time()
-        nexus.write(f"Benchmark entry {i}: This is test content for performance measurement.", 
+        nexus.write(f"Benchmark entry {i}: This is test content for performance measurement.",
                    source="benchmark", confidence=0.5)
         write_times.append(time.time() - start)
-    
+
     # Search benchmark
     search_times = []
     for i in range(iterations):
         start = time.time()
         nexus.search("benchmark test", limit=5)
         search_times.append(time.time() - start)
-    
+
     # Calculate statistics
     avg_write = sum(write_times) / len(write_times) * 1000
     avg_search = sum(search_times) / len(search_times) * 1000
     p95_write = sorted(write_times)[int(len(write_times) * 0.95)] * 1000
     p95_search = sorted(search_times)[int(len(search_times) * 0.95)] * 1000
-    
+
     click.echo("\n=== Benchmark Results ===")
     click.echo(f"Write: avg={avg_write:.2f}ms, p95={p95_write:.2f}ms")
     click.echo(f"Search: avg={avg_search:.2f}ms, p95={p95_search:.2f}ms")
@@ -237,12 +237,12 @@ def benchmark(ctx: click.Context, iterations: int):
 def health(ctx: click.Context):
     """Run health checks."""
     db_path = ctx.obj["db_path"]
-    
+
     checks = {}
-    
+
     # 1. Database file exists
     checks["db_exists"] = db_path.exists()
-    
+
     # 2. Database readable
     if checks["db_exists"]:
         try:
@@ -254,7 +254,7 @@ def health(ctx: click.Context):
             checks["db_readable"] = False
     else:
         checks["db_readable"] = False
-    
+
     # 3. FTS5 available
     if checks["db_readable"]:
         try:
@@ -267,7 +267,7 @@ def health(ctx: click.Context):
             checks["fts5_available"] = False
     else:
         checks["fts5_available"] = False
-    
+
     # 4. Write permission
     try:
         test_file = db_path.parent / ".test_write"
@@ -276,14 +276,14 @@ def health(ctx: click.Context):
         checks["write_permission"] = True
     except Exception:
         checks["write_permission"] = False
-    
+
     # 5. Dependencies
     try:
         import numpy
         checks["numpy_installed"] = True
     except ImportError:
         checks["numpy_installed"] = False
-    
+
     # Print results
     click.echo("=== Health Check ===")
     all_ok = True
@@ -292,7 +292,7 @@ def health(ctx: click.Context):
         click.echo(f"  {icon} {check}: {status}")
         if not status:
             all_ok = False
-    
+
     if all_ok:
         click.echo("\n✓ All checks passed!")
     else:

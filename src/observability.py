@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional
 
 class StructuredLogger:
     """结构化日志器"""
-    
+
     def __init__(
         self,
         name: str,
@@ -35,20 +35,20 @@ class StructuredLogger:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(getattr(logging, level.upper()))
         self.json_format = json_format
-        
+
         # 控制台处理器
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.DEBUG)
-        
+
         if json_format:
             console_handler.setFormatter(JsonFormatter())
         else:
             console_handler.setFormatter(
                 logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             )
-        
+
         self.logger.addHandler(console_handler)
-        
+
         # 文件处理器
         if log_file:
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -56,7 +56,7 @@ class StructuredLogger:
             file_handler.setLevel(logging.DEBUG)
             file_handler.setFormatter(JsonFormatter())
             self.logger.addHandler(file_handler)
-    
+
     def _log(self, level: str, message: str, **kwargs):
         """记录日志"""
         extra = {
@@ -65,35 +65,35 @@ class StructuredLogger:
             "message": message,
             **kwargs,
         }
-        
+
         getattr(self.logger, level.lower())(
             message,
             extra={"structured": extra} if not self.json_format else None,
         )
-        
+
         if self.json_format:
             # 直接输出 JSON
             print(json.dumps(extra), file=sys.stdout)
-    
+
     def info(self, message: str, **kwargs):
         self._log("INFO", message, **kwargs)
-    
+
     def warning(self, message: str, **kwargs):
         self._log("WARNING", message, **kwargs)
-    
+
     def error(self, message: str, **kwargs):
         self._log("ERROR", message, **kwargs)
-    
+
     def debug(self, message: str, **kwargs):
         self._log("DEBUG", message, **kwargs)
-    
+
     def critical(self, message: str, **kwargs):
         self._log("CRITICAL", message, **kwargs)
 
 
 class JsonFormatter(logging.Formatter):
     """JSON 格式化器"""
-    
+
     def format(self, record):
         log_data = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -104,13 +104,13 @@ class JsonFormatter(logging.Formatter):
             "function": record.funcName,
             "line": record.lineno,
         }
-        
+
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
-        
+
         if hasattr(record, "structured"):
             log_data.update(record.structured)
-        
+
         return json.dumps(log_data)
 
 
@@ -118,27 +118,27 @@ class JsonFormatter(logging.Formatter):
 
 class MetricsCollector:
     """指标收集器"""
-    
+
     def __init__(self):
         self.counters: Dict[str, int] = {}
         self.gauges: Dict[str, float] = {}
         self.histograms: Dict[str, List[float]] = {}
         self.start_time = time.time()
-    
+
     def increment(self, name: str, value: int = 1):
         """增加计数器"""
         self.counters[name] = self.counters.get(name, 0) + value
-    
+
     def set_gauge(self, name: str, value: float):
         """设置仪表盘值"""
         self.gauges[name] = value
-    
+
     def observe(self, name: str, value: float):
         """记录直方图值"""
         if name not in self.histograms:
             self.histograms[name] = []
         self.histograms[name].append(value)
-    
+
     @contextmanager
     def timer(self, name: str):
         """计时器上下文管理器"""
@@ -146,7 +146,7 @@ class MetricsCollector:
         yield
         duration = time.time() - start
         self.observe(name, duration)
-    
+
     def get_metrics(self) -> Dict:
         """获取所有指标"""
         metrics = {
@@ -155,7 +155,7 @@ class MetricsCollector:
             "histograms": {},
             "uptime_seconds": time.time() - self.start_time,
         }
-        
+
         # 计算直方图统计
         for name, values in self.histograms.items():
             if values:
@@ -170,36 +170,35 @@ class MetricsCollector:
                     "p95": sorted_values[int(len(sorted_values) * 0.95)],
                     "p99": sorted_values[int(len(sorted_values) * 0.99)],
                 }
-        
+
         return metrics
-    
+
     def export_prometheus(self) -> str:
         """导出 Prometheus 格式"""
         lines = []
-        
+
         # 计数器
         for name, value in self.counters.items():
             lines.append(f"# TYPE {name} counter")
             lines.append(f"{name} {value}")
-        
+
         # 仪表盘
         for name, value in self.gauges.items():
             lines.append(f"# TYPE {name} gauge")
             lines.append(f"{name} {value}")
-        
+
         # 直方图
         for name, values in self.histograms.items():
             if values:
-                sorted_values = sorted(values)
                 lines.append(f"# TYPE {name} histogram")
                 lines.append(f"{name}_count {len(values)}")
                 lines.append(f"{name}_sum {sum(values)}")
-                
+
                 # 分位数
                 for bucket in [0.1, 0.5, 1.0, 5.0, 10.0]:
                     count = sum(1 for v in values if v <= bucket)
                     lines.append(f'{name}_bucket{{le="{bucket}"}} {count}')
-        
+
         return "\n".join(lines)
 
 
@@ -207,19 +206,19 @@ class MetricsCollector:
 
 class HealthChecker:
     """健康检查器"""
-    
+
     def __init__(self):
         self.checks: Dict[str, callable] = {}
-    
+
     def register(self, name: str, check_fn: callable):
         """注册健康检查"""
         self.checks[name] = check_fn
-    
+
     def run_checks(self) -> Dict:
         """运行所有健康检查"""
         results = {}
         all_healthy = True
-        
+
         for name, check_fn in self.checks.items():
             try:
                 result = check_fn()
@@ -235,7 +234,7 @@ class HealthChecker:
                     "error": str(e),
                 }
                 all_healthy = False
-        
+
         return {
             "status": "healthy" if all_healthy else "unhealthy",
             "checks": results,
@@ -247,11 +246,11 @@ class HealthChecker:
 
 class Tracer:
     """追踪器"""
-    
+
     def __init__(self, service_name: str = "nexus-memory"):
         self.service_name = service_name
         self.spans: List[Dict] = []
-    
+
     @contextmanager
     def start_span(self, name: str, attributes: Dict = None):
         """开始一个新的 span"""
@@ -263,7 +262,7 @@ class Tracer:
             "start_time": time.time(),
             "attributes": attributes or {},
         }
-        
+
         try:
             yield span
         except Exception as e:
@@ -273,11 +272,11 @@ class Tracer:
             span["end_time"] = time.time()
             span["duration"] = span["end_time"] - span["start_time"]
             self.spans.append(span)
-    
+
     def get_spans(self) -> List[Dict]:
         """获取所有 spans"""
         return self.spans
-    
+
     def export_json(self) -> str:
         """导出 JSON 格式"""
         return json.dumps({

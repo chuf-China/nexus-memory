@@ -79,20 +79,24 @@ class SearchExtMixin:
 
         if mode in ("graph", "hybrid"):
             try:
-                from agent.nexus_graph import EntityGraph
+                from .nexus_graph import EntityGraph
                 eg = EntityGraph(self._conn())
                 graph_results = eg.search_by_graph(query, limit=limit * 2)
                 for r in graph_results:
                     r["_source"] = "graph"
+                    # graph results use entry_id; normalize to id for
+                    # downstream consumers (_update_domain_scores etc.)
+                    if "id" not in r and "entry_id" in r:
+                        r["id"] = r["entry_id"]
                 results.extend(graph_results)
             except Exception:
                 pass
 
-        if mode == "fts" or (mode == "hybrid" and not results):
+        if mode == "fts" or (mode in ("hybrid", "semantic") and not results):
             # FTS5 search always available as fallback
             pass  # fall through to FTS below
 
-        if mode == "fts" or (mode == "hybrid" and len(results) < limit) or mode not in ("semantic", "graph", "hybrid"):
+        if mode == "fts" or (mode in ("hybrid", "semantic") and len(results) < limit) or mode not in ("semantic", "graph", "hybrid"):
             clean = _CONTENT_WHITESPACE.sub(' ', query).strip()
         else:
             clean = ""
@@ -136,18 +140,22 @@ class SearchExtMixin:
         # ── Fallback: LIKE %% (zero results from FTS5 or FTS5 error) ──
         if not fts_results:
             try:
+                # 按词拆分 OR 匹配：中文整句 LIKE 几乎永不命中，
+                # 拆词后任一 token 命中即返回（fts 与 semantic 兜底共用）
+                tokens = [t for t in seg_query.split() if t]
+                like_clause = " OR ".join(["uk.content LIKE ?"] * len(tokens)) if tokens else "1=0"
                 rows = conn.execute(
-                    """SELECT uk.id, uk.content, uk.domain_scores, uk.layer,
+                    f"""SELECT uk.id, uk.content, uk.domain_scores, uk.layer,
                               uk.positive_feedback, uk.negative_feedback,
                               uk.active_summary, uk.user_id
                        FROM unified_knowledge uk
-                       WHERE uk.content LIKE ?
+                       WHERE ({like_clause})
                          AND uk.status = 'active'
                          AND (uk.user_id = ? OR uk.user_id = 'default')
                        ORDER BY (uk.positive_feedback - uk.negative_feedback * 2) DESC,
                                 uk.last_accessed DESC
                        LIMIT ?""",
-                    (f"%{clean}%", user_id, limit * 2)
+                    [f"%{t}%" for t in tokens] + [user_id, limit * 2]
                 ).fetchall()
 
                 for row in rows:
@@ -178,8 +186,8 @@ class SearchExtMixin:
         # (only for hybrid mode — boosts recall beyond single-query FTS5)
         if mode == "hybrid":
             try:
-                from agent.nexus_search import expand_query, is_negation_query
-                from agent.nexus_search import extract_entities, needs_relative_time
+                from .nexus_search import expand_query, is_negation_query
+                from .nexus_search import extract_entities, needs_relative_time
                 seen_ids = {r.get("entry_id") or r.get("id") for r in results}
 
                 # Query expansion: synonyms + entities + keywords
@@ -256,8 +264,7 @@ class SearchExtMixin:
 
                 # Negation: negated query → search without negation terms
                 if is_negation_query(query):
-                    import re
-                    from agent.nexus_search import _NEGATION_WORDS
+                    from .nexus_search import _NEGATION_WORDS
                     neg_terms = _NEGATION_WORDS.sub("", query).strip()
                     if neg_terms:
                         seg_neg = _segment_fts(neg_terms)
@@ -297,7 +304,7 @@ class SearchExtMixin:
 
         # ── Rerank: cross-encoder + score fusion ──────────
         try:
-            from agent.nexus_embedder import Reranker
+            from .nexus_embedder import Reranker
             reranker = Reranker()
             results = reranker.rerank(query, results, top_k=limit)
         except Exception:
@@ -360,7 +367,7 @@ class SearchExtMixin:
             Formatted context string ready for LLM injection.
         """
         try:
-            from agent.nexus_search import build_context_v2
+            from .nexus_search import build_context_v2
             return build_context_v2(
                 results, max_tokens=max_tokens,
                 question=question, session_dates=session_dates
@@ -375,7 +382,7 @@ class SearchExtMixin:
 
     def _update_domain_scores(self, results: List[Dict], user_id: str):
         """Increment domain scores for searched entries based on query context.
-        
+
         Simplified: we just mark them as accessed. Full domain inference
         requires knowing the query's domain context from the agent.
         """

@@ -450,7 +450,7 @@ class StatsMixin:
 
         # Stage 6: Belief update — time decay + archive
         try:
-            from agent.nexus_belief import BeliefEngine
+            from .nexus_belief import BeliefEngine
             be = BeliefEngine(conn)
             belief_result = be.update_all_beliefs()
             if belief_result["decayed_count"] or belief_result["archived_count"]:
@@ -626,7 +626,7 @@ class StatsMixin:
 
         # ── Stage 10: Miner — scan interaction patterns ─────────────────────
         try:
-            from agent.nexus_miner import NexusMiner
+            from .nexus_miner import NexusMiner
             miner = NexusMiner()
             report = miner.mine_all()
             miner.close()

@@ -18,13 +18,13 @@ Nexus 默认将所有知识视为"事实"。Belief Network 引入三级认知状
 晋升:
   confidence >= 0.70 → belief (如果当前是 observation)
   confidence >= 0.90 → fact (如果当前是 belief)
-  
+
 降级:
   confidence < 0.70 → observation (如果当前是 belief)
   confidence < 0.30 → archived (标记为低可信)
 
 用法:
-  from agent.nexus_belief import BeliefEngine
+  from .nexus_belief import BeliefEngine
   be = BeliefEngine(conn)
   be.on_encounter(knowledge_id)     # 再次遇到
   be.on_feedback(knowledge_id, +1)  # 正反馈

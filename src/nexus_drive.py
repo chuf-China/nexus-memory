@@ -38,7 +38,7 @@ class NexusDrive:
         """获取或创建 NexusCore 实例（连接复用）。"""
         if self._nc is None:
             try:
-                from agent.nexus_core import NexusCore
+                from .nexus_core import NexusCore
                 self._nc = NexusCore(str(_NEXUS_DB))
             except Exception as e:
                 logger.debug("NexusDrive: failed to create NexusCore: %s", e)
@@ -91,7 +91,7 @@ class NexusDrive:
             nc._demote(knowledge_id, "user_correction", "default")
 
             # 2. 运行 miner 检查同域风险
-            from agent.nexus_miner import NexusMiner
+            from .nexus_miner import NexusMiner
             miner = NexusMiner()
             report = miner.mine_all()
             miner.close()
@@ -110,7 +110,6 @@ class NexusDrive:
             return  # 事件太少，不用管
 
         recent_writes = sum(1 for e in self._event_log if e["type"] == "write")
-        recent_corrects = sum(1 for e in self._event_log if e["type"] == "correct")
 
         if recent_writes > 20:
             try:

@@ -134,7 +134,6 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     """关闭数据库连接"""
-    global nexus
     if nexus:
         nexus.close()
         print("✓ Database connection closed")
@@ -146,7 +145,7 @@ async def shutdown():
 async def health_check():
     """健康检查"""
     import sqlite3
-    
+
     checks = {
         "status": "healthy",
         "db_exists": Path(db_path).exists(),
@@ -155,29 +154,29 @@ async def health_check():
         "write_permission": False,
         "total_entries": 0,
     }
-    
+
     if checks["db_exists"]:
         try:
             conn = sqlite3.connect(db_path)
             conn.execute("SELECT 1")
             checks["db_readable"] = True
-            
+
             # Check FTS5
             try:
                 conn.execute("SELECT fts5()")
                 checks["fts5_available"] = True
             except Exception:
                 pass
-            
+
             # Count entries
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM knowledge")
             checks["total_entries"] = cursor.fetchone()[0]
-            
+
             conn.close()
         except Exception:
             pass
-    
+
     # Check write permission
     try:
         test_file = Path(db_path).parent / ".test_write"
@@ -186,10 +185,10 @@ async def health_check():
         checks["write_permission"] = True
     except Exception:
         pass
-    
+
     if not all([checks["db_exists"], checks["db_readable"], checks["write_permission"]]):
         checks["status"] = "unhealthy"
-    
+
     return HealthResponse(**checks)
 
 
@@ -198,7 +197,7 @@ async def write_knowledge(knowledge: KnowledgeWrite):
     """写入知识"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
-    
+
     result = nexus.write(
         content=knowledge.content,
         source=knowledge.source,
@@ -206,10 +205,10 @@ async def write_knowledge(knowledge: KnowledgeWrite):
         domain=knowledge.domain,
         user_id=knowledge.user_id,
     )
-    
+
     if not result.get("success"):
         raise HTTPException(status_code=500, detail="Failed to write knowledge")
-    
+
     return KnowledgeResponse(
         id=result["id"],
         content=knowledge.content,
@@ -230,14 +229,14 @@ async def search_knowledge(
     """搜索知识"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
-    
+
     results = nexus.search(
         query=query,
         limit=limit,
         domain_filter=domain,
         user_id=user_id,
     )
-    
+
     return [
         KnowledgeResponse(
             id=r.get("id", 0),
@@ -257,7 +256,7 @@ async def get_knowledge(knowledge_id: int):
     """获取知识"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
-    
+
     # 查询数据库
     import sqlite3
     conn = sqlite3.connect(db_path)
@@ -265,10 +264,10 @@ async def get_knowledge(knowledge_id: int):
     cursor.execute("SELECT * FROM knowledge WHERE id = ?", (knowledge_id,))
     row = cursor.fetchone()
     conn.close()
-    
+
     if not row:
         raise HTTPException(status_code=404, detail="Knowledge not found")
-    
+
     # 假设列顺序: id, content, source, confidence, domain, created_at, ...
     return KnowledgeResponse(
         id=row[0],
@@ -285,29 +284,29 @@ async def get_stats():
     """获取统计信息"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
-    
+
     import sqlite3
-    
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     # 总条目数
     cursor.execute("SELECT COUNT(*) FROM knowledge")
     total_entries = cursor.fetchone()[0]
-    
+
     # 按来源统计
     cursor.execute("SELECT source, COUNT(*) FROM knowledge GROUP BY source")
     by_source = dict(cursor.fetchall())
-    
+
     # 按域统计
     cursor.execute("SELECT domain, COUNT(*) FROM knowledge GROUP BY domain")
     by_domain = dict(cursor.fetchall())
-    
+
     conn.close()
-    
+
     # 数据库大小
     db_size_mb = Path(db_path).stat().st_size / 1024 / 1024
-    
+
     return StatsResponse(
         total_entries=total_entries,
         by_source=by_source,
@@ -321,7 +320,7 @@ async def consolidate_session(request: ConsolidateRequest):
     """整合会话"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
-    
+
     nexus.consolidate(request.session_id)
     return {"status": "success", "session_id": request.session_id}
 
@@ -331,7 +330,7 @@ async def submit_feedback(request: FeedbackRequest):
     """提交反馈"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
-    
+
     nexus.feedback(request.knowledge_id, request.feedback_type, user_id=request.user_id)
     return {"status": "success", "knowledge_id": request.knowledge_id}
 
@@ -343,7 +342,7 @@ async def get_system_prompt(
     """获取系统提示"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
-    
+
     block = nexus.system_prompt_block(user_id=user_id)
     return {"system_prompt": block}
 
@@ -353,20 +352,20 @@ async def get_system_prompt(
 def main():
     """启动服务器"""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Nexus Memory REST API")
     parser.add_argument("--host", default="127.0.0.1", help="绑定地址 (默认: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="端口 (默认: 8000)")
     parser.add_argument("--db", default=None, help="数据库路径")
-    
+
     args = parser.parse_args()
-    
+
     if args.db:
         os.environ["NEXUS_DB_PATH"] = args.db
-    
+
     print(f"Starting Nexus Memory API on {args.host}:{args.port}")
     print(f"Docs: http://{args.host}:{args.port}/docs")
-    
+
     uvicorn.run(app, host=args.host, port=args.port)
 
 

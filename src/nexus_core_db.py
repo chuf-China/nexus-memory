@@ -135,19 +135,19 @@ class DbMixin:
             return
 
         conn = self._conn()
-        
+
         # Drop stale triggers (no more knowledge_ai — handled in code)
         for trig in ('knowledge_ai', 'knowledge_ad', 'knowledge_au'):
             conn.execute(f"DROP TRIGGER IF EXISTS {trig}")
-        
+
         # FTS table: use CREATE IF NOT EXISTS — no destructive drop.
         # The schema DDL recreates it only when the VIRTUAL TABLE definition
         # changes (which requires a rebuild). Normal init skips it.
-        
+
         schema = schema_path.read_text()
         conn.executescript(schema)
         conn.commit()
-        
+
         # Check FTS integrity: rebuild if count mismatch
         self._ensure_fts_integrity(conn)
 

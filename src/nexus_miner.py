@@ -7,7 +7,7 @@
   4. 知识衰退检测: 长期不用但有效 → 归档建议
 
 用法:
-  from agent.nexus_miner import NexusMiner
+  from .nexus_miner import NexusMiner
   miner = NexusMiner()
   report = miner.mine_all()
   print(report)
@@ -151,7 +151,6 @@ class NexusMiner:
 
         # 提取关键词→知识ID 共现
         # 用简单的词频统计，不做复杂关联规则挖掘
-        from collections import defaultdict
         # 关键词→{知识ID→count}
         kw_knowledge: Dict[str, Counter] = defaultdict(Counter)
         # 关键词出现总次数
@@ -225,7 +224,6 @@ class NexusMiner:
         if not self.conn:
             return []
 
-        now = datetime.now(timezone.utc).isoformat()
         threshold = (datetime.now(timezone.utc) - timedelta(days=days_threshold)).isoformat()
 
         rows = self.conn.execute(
@@ -288,7 +286,6 @@ class NexusMiner:
 
         # 按领域统计准确率
         # 用 knowledge 的 domain_scores 推断"这是什么领域的问题"
-        domain_stats: Dict[str, Dict] = {}
         total_queries = 0
         corrected_queries = 0
         domain_queries: Dict[str, int] = {}
@@ -372,7 +369,7 @@ class NexusMiner:
         if not model.get("capability_boundary"):
             return
 
-        from agent.nexus_core import NexusCore
+        from .nexus_core import NexusCore
         from pathlib import Path
         nc = NexusCore(str(Path.home() / ".hermes" / "data" / "nexus" / "nexus.db"))
 

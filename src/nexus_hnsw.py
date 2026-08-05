@@ -3,7 +3,7 @@
 将 nexus_core._search_semantic() 中的 O(n) 线性扫描替换为 O(log n) 近似最近邻搜索。
 
 用法:
-  from agent.nexus_hnsw import HNSWIndex
+  from .nexus_hnsw import HNSWIndex
   idx = HNSWIndex(conn, dim=512)
   idx.build()           # 从 knowledge_embeddings 表重建
   idx.search(query_vec, k=10)  # 返回 [(entry_id, score), ...]

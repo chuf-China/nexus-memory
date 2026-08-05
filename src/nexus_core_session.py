@@ -79,7 +79,6 @@ class SessionMixin:
 
         Returns: resolved user_id (always a string)
         """
-        import hashlib
         conn = self._conn()
 
         # Compute fingerprint

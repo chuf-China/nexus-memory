@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from nexus.core import NexusCore
+from src.nexus_core import NexusCore
 
 
 def _make_nc():
@@ -434,7 +434,7 @@ def test_extract_metrics():
 
 
 def test_backup_db():
-    from nexus.core import NexusCore
+    from src.nexus_core import NexusCore
     nc, p = _make_nc()
     try:
         nc.write("备份测试数据条目", user_id="backup")
@@ -527,7 +527,7 @@ def test_get_model_stats_all():
     nc, p = _make_nc()
     try:
         nc.record_model_performance("gpt-4o", "coding", 0.9, "s1")
-        nc.record_model_performance("gpt-4o", "writing", 0.85, "s2")
+        nc.record_model_performance("claude-3.5", "writing", 0.85, "s2")
         stats = nc.get_model_stats()  # All models
         assert len(stats) == 2
     finally:

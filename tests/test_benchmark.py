@@ -24,10 +24,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from nexus.core import NexusCore
-from nexus.belief import BeliefEngine
-from nexus.evolve import evolve_on_write, find_merge_target
-from nexus.constitution import Constitution
+from src.nexus_core import NexusCore
+from src.nexus_belief import BeliefEngine
+from src.nexus_evolve import evolve_on_write, find_merge_target
+from src.nexus_constitution import Constitution
 
 
 # ── 测试数据 ───────────────────────────────────────────────

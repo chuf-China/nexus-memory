@@ -7,7 +7,7 @@
   4. Context builder: 排序 + 去重 + 截断 + 时间注入 + 引用标注
 
 用法:
-  from agent.nexus_search import EnhancedSearch
+  from .nexus_search import EnhancedSearch
   es = EnhancedSearch(nc)
   results = es.search("When did Caroline go to the LGBTQ support group?", ...)
   context = es.build_context(results, max_tokens=2000, question=question)
@@ -271,7 +271,7 @@ class EnhancedSearch:
 
         # 如果有 cross-encoder，用原 query 做最终重排
         try:
-            from agent.nexus_embedder import Reranker
+            from .nexus_embedder import Reranker
             reranker = Reranker()
             reranker._load_cross_encoder()
             if reranker._model and reranker._model != "score_only":
