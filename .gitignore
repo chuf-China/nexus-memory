@@ -78,3 +78,4 @@ Thumbs.db
 hnsw_index/
 # 测试运行自动刷新，不入库
 benchmark_report.md
+benchmark_results.json

@@ -301,9 +301,8 @@ class SearchExtMixin:
 
         # ── Rerank: cross-encoder + score fusion ──────────
         try:
-            from .nexus_embedder import Reranker
-            reranker = Reranker()
-            results = reranker.rerank(query, results, top_k=limit)
+            from .nexus_embedder import get_reranker
+            results = get_reranker().rerank(query, results, top_k=limit)
         except Exception:
             pass
 

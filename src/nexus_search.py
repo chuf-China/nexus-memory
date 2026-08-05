@@ -271,8 +271,8 @@ class EnhancedSearch:
 
         # 如果有 cross-encoder，用原 query 做最终重排
         try:
-            from .nexus_embedder import Reranker
-            reranker = Reranker()
+            from .nexus_embedder import get_reranker
+            reranker = get_reranker()
             reranker._load_cross_encoder()
             if reranker._model and reranker._model != "score_only":
                 all_results = reranker.rerank(query, all_results, top_k=limit * 3)

@@ -267,6 +267,19 @@ def get_embedder() -> BaseEmbedder:
     return EmbedderFactory.create("fastembed")
 
 
+_reranker_instance = None
+
+
+def get_reranker() -> "Reranker":
+    """Get singleton reranker. Cross-encoder weights load once per process;
+    constructing a new Reranker per call would reload 100+ weight blocks
+    from disk on every search (~100ms each)."""
+    global _reranker_instance
+    if _reranker_instance is None:
+        _reranker_instance = Reranker()
+    return _reranker_instance
+
+
 # ═══════════════════════════════════════════════════════════
 # Reranker
 # ═══════════════════════════════════════════════════════════
