@@ -1,65 +1,66 @@
 # 结构化事实
 
-FactStore 以 subject-predicate-object 三元组形式存储结构化事实。
+结构化事实以 subject-predicate-object 三元组形式存储。写入 Nexus 时由
+写时合并（`evolve_on_write`）自动维护"同一事实只保留最新值"的不变式。
 
 ## 基本用法
 
 ```python
-from nexus.facts import FactStore
+from src.nexus_core import NexusCore
 
-fs = FactStore(conn)
+nexus = NexusCore("nexus.db")
 
-# 添加事实
-fs.add("PostgreSQL", "version", "16", confidence=0.95)
-fs.add("Python", "uses", "SQLite", confidence=0.9)
+# 写入事实（高初始置信度）
+nexus.write("PostgreSQL 版本 16", source_session_id="facts", initial_confidence=0.95)
+nexus.write("Python 使用 SQLite", source_session_id="facts", initial_confidence=0.9)
 
 # 查询
-facts = fs.query(subject="PostgreSQL")
-facts = fs.query(predicate="version")
+results = nexus.search("PostgreSQL 版本", limit=5)
 ```
 
 ## 冲突检测
 
-同一 subject+predicate 只保留最新值：
+write 时自动合并/取代重复或矛盾的内容：
 
 ```python
-fs.add("Python", "version", "3.11")  # 添加
-fs.add("Python", "version", "3.12")  # 自动取代 3.11
-
-active = fs.query(subject="Python", predicate="version")
-# → [{"object": "3.12", "confidence": 0.95}]
+nexus.write("Python 版本 3.11")
+nexus.write("Python 版本 3.12")  # 自动取代 3.11（supersede）
 ```
 
-**冲突类型（LLM 分类）：**
-| 类型 | 动作 | 说明 |
-|------|------|------|
-| CONTRADICTS | supersede | 直接矛盾 |
-| UPDATES | supersede | 新值更新旧值 |
-| REFINES | add | 新值更精确 |
-| DUPLICATE | merge | 重复，合并置信度 |
-| COMPATIBLE | add | 不冲突的不同谓词 |
+**写时合并动作（`evolve_on_write`）：**
+
+| 动作 | 说明 |
+|------|------|
+| exact_dup | 完全重复，不新增条目 |
+| fuzzy_dup | 语义重复，合并到目标条目 |
+| complement | 互补内容，合并到目标条目 |
+| supersede | 新值取代旧值（旧条目标记 superseded） |
 
 ## 事实抽取
 
 ```python
-from nexus.facts import FactExtractor
+from src.nexus_extract import extract_knowledge, extract_on_turn
 
-fe = FactExtractor(conn)
-fe.extract("PostgreSQL uses JSONB and supports full-text search")
-# 自动存储提取的 SPO 三元组
+# 从单条消息抽取知识
+for k in extract_knowledge("PostgreSQL 使用 JSONB 并支持全文检索"):
+    print(k)  # {"content": ..., "domain": ...}
+
+# 从对话轮次抽取（含纠正检测）
+extract_on_turn("PostgreSQL 是什么？", "PostgreSQL 是关系型数据库")
 ```
 
 ## 历史追溯
 
 ```python
-hist = fs.history("Python", "version")
-# → [{"object": "3.12", "superseded_by": None},
-#    {"object": "3.11", "superseded_by": 2}]
+history = nexus.get_history(knowledge_id)
+# → [{"changed_at": ..., "note": "superseded ..."}, ...]
 ```
 
 ## 导出为图边
 
 ```python
-edges = fs.to_graph_edges()
-# → [("PostgreSQL", "version", "16"), ...]
+from src.nexus_graph import EntityGraph
+
+eg = EntityGraph(conn)  # conn = sqlite3 connection
+edges = eg.search_by_graph("PostgreSQL")  # 实体关系遍历
 ```

@@ -38,7 +38,7 @@ class NexusCore(
     Usage:
         from src.nexus_core import NexusCore
         nexus = NexusCore("nexus.db")
-        nexus.write("fact", source="conversation")
+        nexus.write("fact", source_session_id="conversation")
         results = nexus.search("query")
     """
     pass

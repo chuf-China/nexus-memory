@@ -164,7 +164,7 @@ pip install nexus-memory
 from src.nexus_core import NexusCore
 
 nexus = NexusCore("my_agent.db")
-nexus.write("User prefers dark mode", source="conversation", confidence=0.9)
+nexus.write("User prefers dark mode", source_session_id="conversation", initial_confidence=0.9)
 results = nexus.search("UI preferences", limit=5)
 ```
 

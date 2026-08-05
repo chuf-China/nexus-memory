@@ -13,9 +13,6 @@ Nexus Memory 提供两种 API：
 ```python
 from src.nexus_core import NexusCore
 
-# 使用默认数据库
-nexus = NexusCore()
-
 # 使用自定义数据库
 nexus = NexusCore("/path/to/nexus.db")
 ```
@@ -25,10 +22,9 @@ nexus = NexusCore("/path/to/nexus.db")
 ```python
 result = nexus.write(
     content="User prefers Python type hints",
-    source="conversation",
-    confidence=0.9,
-    domain="workflow",
     user_id="user123",
+    source_session_id="conversation",
+    initial_confidence=0.9,
 )
 
 print(result)
@@ -44,25 +40,27 @@ print(result)
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | content | str | 必填 | 知识内容 |
-| source | str | "conversation" | 来源 |
-| confidence | float | 0.8 | 置信度 (0-1) |
-| domain | str | "general" | 知识域 |
 | user_id | str | "default" | 用户 ID |
+| source_session_id | str | "" | 来源会话 ID |
+| source_snippet | str | "" | 来源片段 |
+| initial_confidence | float | None | 初始置信度（None = 按层默认） |
 
 ### 搜索知识
 
 ```python
 results = nexus.search(
     query="What coding style does the user prefer?",
-    limit=5,
-    domain_filter="workflow",
     user_id="user123",
+    limit=5,
+    mode="fts",  # fts | semantic | graph | hybrid
 )
+
+# 按域检索（无 domain_filter 参数）
+results = nexus.search_by_domain(domain="workflow", user_id="user123", limit=5)
 
 for result in results:
     print(f"ID: {result['id']}")
     print(f"Content: {result['content']}")
-    print(f"Score: {result['score']}")
 ```
 
 **参数：**
@@ -70,9 +68,9 @@ for result in results:
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | query | str | 必填 | 搜索查询 |
-| limit | int | 5 | 返回数量 |
-| domain_filter | str | None | 域过滤 |
 | user_id | str | "default" | 用户 ID |
+| limit | int | 5 | 返回数量 |
+| mode | str | "fts" | 检索模式：fts / semantic / graph / hybrid |
 
 **返回：**
 
@@ -81,11 +79,10 @@ for result in results:
     {
         "id": 123,
         "content": "User prefers Python type hints",
-        "source": "conversation",
-        "confidence": 0.9,
-        "domain": "workflow",
-        "score": 0.95,
-        "created_at": "2026-06-01T12:00:00Z",
+        "domain_scores": {"workflow": 1, "identity": 0, ...},
+        "layer": "instant",  # instant | candidate | consolidated
+        "user_id": "user123",
+        "active_summary": "...",
     },
     ...
 ]
@@ -96,17 +93,15 @@ for result in results:
 ```python
 block = nexus.system_prompt_block(user_id="user123")
 print(block)
-# [
-#   Knowledge:
-#   - User prefers Python type hints (confidence: 0.9)
-#   - ...
-# ]
+# ═══ MEMORY (your personal notes) [45% — 980/2,200 chars] ═══
+# - User prefers Python type hints
+# （记忆注入 system prompt 前自动威胁扫描，命中内容替换为 [BLOCKED: ...]）
 ```
 
-### 整合会话
+### 整合用户知识
 
 ```python
-nexus.consolidate(session_id="session_123")
+nexus.consolidate(user_id="user123")
 ```
 
 ### 提交反馈
@@ -117,30 +112,6 @@ nexus.feedback(
     feedback_type="positive",  # or "negative"
     user_id="user123",
 )
-```
-
-### 获取统计
-
-```python
-stats = nexus.get_stats()
-print(stats)
-# {
-#     "total_entries": 1000,
-#     "by_source": {"conversation": 800, "manual": 200},
-#     "by_domain": {"workflow": 500, "identity": 300, "general": 200},
-# }
-```
-
-### 注册钩子
-
-```python
-def pre_llm_call_hook(context):
-    """在 LLM 调用前执行"""
-    context["alerts"] = nexus.get_alerts()
-    context["temporal"] = nexus.search_temporal(context["query"])
-    return context
-
-nexus.register_hook("pre_llm_call", pre_llm_call_hook)
 ```
 
 ### 关闭连接
@@ -277,7 +248,7 @@ POST /consolidate
 Content-Type: application/json
 
 {
-    "session_id": "session_123"
+    "user_id": "user123"
 }
 ```
 
@@ -385,8 +356,8 @@ from src.nexus_core import NexusCore
 nexus = NexusCore("my_agent.db")
 
 # 写入知识
-nexus.write("User prefers dark mode", source="settings")
-nexus.write("User is a Python developer", source="conversation")
+nexus.write("User prefers dark mode", source_session_id="settings")
+nexus.write("User is a Python developer", source_session_id="conversation")
 
 # 搜索知识
 results = nexus.search("What does the user prefer?", limit=3)
@@ -400,8 +371,8 @@ prompt = f"""You are a helpful assistant.
 
 User: How can I help you?"""
 
-# 整合会话
-nexus.consolidate("session_001")
+# 整合用户知识
+nexus.consolidate("user001")
 
 # 关闭
 nexus.close()
@@ -438,16 +409,18 @@ print(response.json())
 
 ## 最佳实践
 
-1. **置信度管理**
-   - 高置信度 (0.8-1.0)：用户明确确认的信息
-   - 中置信度 (0.5-0.8)：从对话中推断的信息
-   - 低置信度 (0-0.5)：自动提取的信息
+1. **认知分层**（`initial_confidence` 决定起始层，自动晋升/降级）
+   - Observation（观察）：首次出现，低置信度 (0.3-0.5)
+   - Belief（信念）：多次印证 (0.5-0.85)，可被推翻
+   - Fact（事实）：长期验证 (0.85+)，只被纠正替换
 
-2. **知识域划分**
+2. **知识域划分**（六域评分）
    - `identity`：用户身份信息（姓名、角色、偏好）
    - `workflow`：工作流程和习惯
-   - `project`：项目相关信息
-   - `general`：通用知识
+   - `behavior`：行为偏好
+   - `strategy`：策略/方法论
+   - `rule`：规则
+   - `raw_fact`：原始事实
 
 3. **定期整合**
    - 每个会话结束后调用 `consolidate()`
@@ -459,5 +432,5 @@ print(response.json())
 
 ---
 
-**最后更新**: 2026-06-01
+**最后更新**: 2026-08-06
 **版本**: v0.2.0
