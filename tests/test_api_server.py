@@ -12,6 +12,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import pytest
+
+# fastapi/httpx 为可选依赖（CI 基础环境无），缺失时跳过而非收集失败
+pytest.importorskip("fastapi")
+pytest.importorskip("httpx")
 from fastapi.testclient import TestClient
 
 from src.nexus_core import NexusCore

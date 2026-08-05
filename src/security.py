@@ -134,7 +134,7 @@ class RateLimiter:
 
 
 class InputValidator:
-    """输入验证器"""
+    """威胁模式定义（SQL/XSS），供 scan_for_threats 的 technical scope 使用"""
 
     # SQL 注入模式
     SQL_INJECTION_PATTERNS = [
@@ -150,35 +150,6 @@ class InputValidator:
         r"(javascript:)",
         r"(on\w+\s*=)",
     ]
-
-    @classmethod
-    def validate_content(cls, content: str) -> Tuple[bool, Optional[str]]:
-        """验证内容安全性"""
-        # 检查 SQL 注入
-        for pattern in cls.SQL_INJECTION_PATTERNS:
-            if re.search(pattern, content, re.IGNORECASE):
-                return False, f"Potential SQL injection detected: {pattern}"
-
-        # 检查 XSS
-        for pattern in cls.XSS_PATTERNS:
-            if re.search(pattern, content, re.IGNORECASE):
-                return False, f"Potential XSS detected: {pattern}"
-
-        # 检查长度
-        if len(content) > 100000:  # 100KB
-            return False, "Content too long (max 100KB)"
-
-        return None, None
-
-    @classmethod
-    def sanitize_content(cls, content: str) -> str:
-        """清理内容"""
-        # 移除潜在危险字符
-        content = content.replace("\\", "\\\\")
-        content = content.replace("'", "\'")
-        content = content.replace('"', '\"')
-
-        return content
 
 
 class SecurityMiddleware:
@@ -229,18 +200,6 @@ class SecurityMiddleware:
             )
 
         return info
-
-    def validate_input(self, content: str) -> str:
-        """验证并清理输入"""
-        error, message = InputValidator.validate_content(content)
-
-        if error:
-            raise HTTPException(
-                status_code=400,
-                detail=message,
-            )
-
-        return InputValidator.sanitize_content(content)
 
 
 # ============ FastAPI 依赖项 ============
