@@ -310,8 +310,10 @@ class StatsMixin:
             return
 
         try:
+            # 对比全量行数（rebuild 对所有行建索引）：用 active 数对比会把
+            # superseded/archived 行算作失同步 → 每次 init 都触发 rebuild
             uk_count = conn.execute(
-                "SELECT COUNT(*) FROM unified_knowledge WHERE status = 'active'"
+                "SELECT COUNT(*) FROM unified_knowledge"
             ).fetchone()[0]
             fts_count = conn.execute(
                 "SELECT COUNT(*) FROM knowledge_fts"
@@ -329,30 +331,38 @@ class StatsMixin:
             self.rebuild_fts(conn)
 
     def rebuild_fts(self, conn: Optional[sqlite3.Connection] = None) -> int:
-        """Rebuild the FTS index with jieba segmentation for all entries.
+        """Rebuild the FTS index with CJK bigram segmentation for all entries.
 
-        Drops triggers temporarily, purges FTS, re-inserts with segmented
-        content, then restores triggers.
+        Drops the virtual table and recreates it, then re-inserts segmented
+        content for every row. The two obvious alternatives both fail here:
+        - 'rebuild' command: re-tokenizes the RAW content column, so Chinese
+          sentences become single tokens and bigram queries stop matching.
+        - DELETE FROM knowledge_fts: fails on SQLite 3.46.1 with
+          external-content FTS5 tables ("database disk image is malformed").
+        Inserting segmented rows over an existing rowid (the old approach)
+        silently produced undefined duplicates — entries became unsearchable.
 
         Returns: number of indexed entries.
         """
         if conn is None:
             conn = self._conn()
 
-        # Temporarily disable triggers to avoid double-writes
+        # Triggers reference knowledge_fts — drop them first, restore below.
         for trig in ('knowledge_ai', 'knowledge_ad', 'knowledge_au'):
             conn.execute(f"DROP TRIGGER IF EXISTS {trig}")
 
-        # Purge FTS index
-        # NOTE: DELETE FROM knowledge_fts fails on SQLite 3.46.1 with
-        # external-content FTS5 tables ("database disk image is malformed").
-        # Using 'rebuild' command instead — the correct approach for
-        # content-sync FTS5 tables per SQLite docs.
-        conn.execute("INSERT INTO knowledge_fts(knowledge_fts) VALUES('rebuild')")
+        conn.execute("DROP TABLE IF EXISTS knowledge_fts")
+        conn.execute(
+            "CREATE VIRTUAL TABLE knowledge_fts USING fts5("
+            "    content,"
+            "    content='unified_knowledge', content_rowid='id'"
+            ")"
+        )
 
-        # Re-index all active entries with jieba segmentation
+        # Index all rows (superseded/archived are filtered at query time);
+        # count parity with _ensure_fts_integrity relies on this.
         rows = conn.execute(
-            "SELECT id, content FROM unified_knowledge WHERE status = 'active'"
+            "SELECT id, content FROM unified_knowledge"
         ).fetchall()
         count = 0
         for row in rows:
@@ -369,7 +379,7 @@ class StatsMixin:
             conn.executescript(schema_path.read_text())
 
         conn.commit()
-        logger.info("Nexus: FTS index rebuilt with %d entries (jieba segmented)", count)
+        logger.info("Nexus: FTS index rebuilt with %d entries (CJK bigram segmented)", count)
         return count
 
     # -- Sleep-time consolidation (basic) -------------------------------------

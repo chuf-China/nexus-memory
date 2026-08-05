@@ -292,8 +292,10 @@ class WriteMixin:
 
         # ── HNSW 加速的近似最近邻搜索 ────────────────
         try:
-            from .nexus_hnsw import HNSWIndex
-            hnsw = HNSWIndex(self._conn(), dim=embed_dim)
+            from .nexus_hnsw import get_hnsw_index
+            # 进程内缓存实例 + 行数指纹过期检测：
+            # 稳态搜索只花一次 COUNT 查询，不再每次从磁盘重载索引
+            hnsw = get_hnsw_index(self._conn(), dim=embed_dim)
             hnsw.build()
             if hnsw.available:
                 hnsw_results = hnsw.search(q_embed, k=limit)
@@ -535,7 +537,6 @@ class WriteMixin:
         r'[：:]?\s*(.+?)(?:\n|$|。|；)'
     )
 
-    @staticmethod
     @staticmethod
 
     def _extract_metrics(content: str) -> List[tuple]:

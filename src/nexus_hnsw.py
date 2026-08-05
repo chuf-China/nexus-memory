@@ -53,6 +53,8 @@ class HNSWIndex:
         self._lock = threading.Lock()
         self._built = False
         self._available = _HNSW_AVAILABLE
+        # 索引持久化时的 embedding 行数——build() 用它判断索引是否过期
+        self._entry_count: int = 0
 
         # 确保索引目录存在
         _HNSW_INDEX_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,16 +81,41 @@ class HNSWIndex:
             max_elements: 索引最大容量（预分配）
 
         Returns: True 如果索引构建成功
+
+        过期检测：knowledge_embeddings 行数 != 索引持久化时的行数
+        视为过期（有新写入或删除），自动重建。修复旧行为——磁盘
+        索引一旦存在就永远复用，新条目对语义搜索不可见。
         """
         if not _HNSW_AVAILABLE:
             logger.warning("HNSW: hnswlib not installed, falling back to linear scan")
             return False
 
-        # 如果索引已存在且有效，直接加载
-        if not force and self._index_path().exists() and self._ids_path().exists():
-            if self._load():
-                return True
+        if not force:
+            # 内存索引已就绪且数据量未变 → 零成本复用
+            if self._built:
+                if self._count_matches():
+                    return True
+                return self._rebuild(max_elements)
 
+            # 磁盘索引存在 → 加载后同样校验过期
+            if self._index_path().exists() and self._ids_path().exists():
+                if self._load() and self._count_matches():
+                    return True
+
+        return self._rebuild(max_elements)
+
+    def _count_matches(self) -> bool:
+        """knowledge_embeddings 行数与索引构建时一致？"""
+        try:
+            db_count = self.conn.execute(
+                "SELECT COUNT(*) FROM knowledge_embeddings"
+            ).fetchone()[0]
+        except Exception:
+            return False
+        return db_count == self._entry_count
+
+    def _rebuild(self, max_elements: int) -> bool:
+        """全量重建索引（从 DB 读取 embedding）。"""
         with self._lock:
             try:
                 # 从 DB 读取所有 embedding
@@ -136,6 +163,7 @@ class HNSWIndex:
                 data = np.array(vectors, dtype=np.float32)
                 self._index.add_items(data, list(range(num_elements)))
                 self._entry_ids = entry_ids
+                self._entry_count = num_elements
                 self._built = True
 
                 # 设置查询参数
@@ -199,12 +227,12 @@ class HNSWIndex:
         return self.build(force=True)
 
     def _save(self) -> bool:
-        """持久化索引到磁盘"""
+        """持久化索引到磁盘（含 embedding 行数指纹，供过期检测）"""
         try:
             if self._index is not None:
                 self._index.save_index(str(self._index_path()))
                 with open(self._ids_path(), "w") as f:
-                    json.dump(self._entry_ids, f)
+                    json.dump({"ids": self._entry_ids, "count": self._entry_count}, f)
                 logger.debug("HNSW: index saved (%d entries)", len(self._entry_ids))
                 return True
         except Exception as e:
@@ -212,7 +240,7 @@ class HNSWIndex:
         return False
 
     def _load(self) -> bool:
-        """从磁盘加载索引"""
+        """从磁盘加载索引（兼容旧版纯列表格式）"""
         try:
             idx_path = self._index_path()
             ids_path = self._ids_path()
@@ -221,7 +249,13 @@ class HNSWIndex:
                 return False
 
             with open(ids_path) as f:
-                self._entry_ids = json.load(f)
+                payload = json.load(f)
+            if isinstance(payload, dict):
+                self._entry_ids = payload["ids"]
+                self._entry_count = payload.get("count", len(self._entry_ids))
+            else:  # 旧格式：纯列表
+                self._entry_ids = payload
+                self._entry_count = len(payload)
 
             num_elements = len(self._entry_ids)
             if num_elements == 0:
@@ -248,3 +282,19 @@ class HNSWIndex:
             "entry_count": len(self._entry_ids) if self._built else 0,
             "dim": self.dim,
         }
+
+
+# 进程内索引对象缓存：_search_semantic 每次调用都新建 HNSWIndex，
+# 若不缓存，内存索引每次搜索后即丢失，退化为反复从磁盘加载。
+_instance_cache: Dict[Tuple[str, int], HNSWIndex] = {}
+
+
+def get_hnsw_index(conn, dim: int = 512) -> HNSWIndex:
+    """获取（或创建）per-DB 共享的 HNSWIndex 实例。"""
+    db_path = conn.execute("PRAGMA database_list").fetchone()[2]
+    key = (db_path, dim)
+    inst = _instance_cache.get(key)
+    if inst is None:
+        inst = HNSWIndex(conn, dim=dim)
+        _instance_cache[key] = inst
+    return inst

@@ -25,8 +25,10 @@ from .nexus_utils import (
     CONTENT_WHITESPACE,
     content_hash,
     empty_scores,
+    fts_or_query,
     generate_summary,
     incr_score,
+    like_fragments,
     max_domain,
     segment_fts,
 )
@@ -98,20 +100,27 @@ class SearchExtMixin:
         fts_results = []
 
         # ── Primary: FTS5 MATCH ──
+        # OR 语义（fts_or_query）：隐式 AND 会要求查询的所有 unigram 和
+        # bigram 同时出现在文档中，≥4-5 字中文查询几乎必不命中，
+        # 导致检索退化到慢速 LIKE 全表扫描。
         try:
-            rows = conn.execute(
-                """SELECT uk.id, uk.content, uk.domain_scores, uk.layer,
-                          uk.positive_feedback, uk.negative_feedback,
-                          uk.active_summary, uk.user_id
-                   FROM unified_knowledge uk
-                   JOIN knowledge_fts kfts ON uk.id = kfts.rowid
-                   WHERE kfts.content MATCH ?
-                     AND uk.status = 'active'
-                     AND (uk.user_id = ? OR uk.user_id = 'default')
-                   ORDER BY rank
-                   LIMIT ?""",
-                (seg_query, user_id, limit)
-            ).fetchall()
+            match_expr = fts_or_query(seg_query)
+            if match_expr:
+                rows = conn.execute(
+                    """SELECT uk.id, uk.content, uk.domain_scores, uk.layer,
+                              uk.positive_feedback, uk.negative_feedback,
+                              uk.active_summary, uk.user_id
+                       FROM unified_knowledge uk
+                       JOIN knowledge_fts kfts ON uk.id = kfts.rowid
+                       WHERE kfts.content MATCH ?
+                         AND uk.status = 'active'
+                         AND (uk.user_id = ? OR uk.user_id = 'default')
+                       ORDER BY rank
+                       LIMIT ?""",
+                    (match_expr, user_id, limit)
+                ).fetchall()
+            else:
+                rows = []
 
             for row in rows:
                 item = dict(row)
@@ -129,9 +138,10 @@ class SearchExtMixin:
         # ── Fallback: LIKE %% (zero results from FTS5 or FTS5 error) ──
         if not fts_results:
             try:
-                # 按词拆分 OR 匹配：中文整句 LIKE 几乎永不命中，
-                # 拆词后任一 token 命中即返回（fts 与 semantic 兜底共用）
-                tokens = [t for t in seg_query.split() if t]
+                # 用原文连续片段做 LIKE（fts_or_query 修复后此路径极少触发）。
+                # 不能用分词产物：unigram（如'中'）命中所有中文文档，
+                # bigram（如'京通'）在原文中并不以子串形式存在。
+                tokens = like_fragments(clean)
                 like_clause = " OR ".join(["uk.content LIKE ?"] * len(tokens)) if tokens else "1=0"
                 rows = conn.execute(
                     f"""SELECT uk.id, uk.content, uk.domain_scores, uk.layer,
@@ -199,7 +209,7 @@ class SearchExtMixin:
                                  AND (uk.user_id = ? OR uk.user_id = 'default')
                                ORDER BY rank
                                LIMIT ?""",
-                            (seg_eq, user_id, limit)
+                            (fts_or_query(seg_eq), user_id, limit)
                         ).fetchall()
                         for row in ex_rows:
                             item = dict(row)
@@ -235,7 +245,7 @@ class SearchExtMixin:
                                          AND (uk.user_id = ? OR uk.user_id = 'default')
                                        ORDER BY rank
                                        LIMIT ?""",
-                                    (seg_ent, user_id, 5)
+                                    (fts_or_query(seg_ent), user_id, 5)
                                 ).fetchall()
                                 for row in hop_rows:
                                     item = dict(row)
@@ -270,7 +280,7 @@ class SearchExtMixin:
                                          AND (uk.user_id = ? OR uk.user_id = 'default')
                                        ORDER BY rank
                                        LIMIT ?""",
-                                    (seg_neg, user_id, limit)
+                                    (fts_or_query(seg_neg), user_id, limit)
                                 ).fetchall()
                                 for row in neg_rows:
                                     item = dict(row)
@@ -294,18 +304,26 @@ class SearchExtMixin:
         # ── Rerank: cross-encoder + score fusion ──────────
         try:
             from .nexus_embedder import get_reranker
-            results = get_reranker().rerank(query, results, top_k=limit)
+            # 结果数 ≤ limit 时无物可裁剪，跳过 cross-encoder 推理
+            # （~8ms/次，占单路 FTS 搜索 99% 耗时；bm25 已排序）
+            results = get_reranker().rerank(
+                query, results, top_k=limit,
+                use_cross_encoder=len(results) > limit
+            )
         except Exception:
             pass
 
         # ── Auto record domain hit (top 3) ──────────────
+        # 批量写入：record_domain_hit 单次调用自带 commit，搜索路径
+        # 逐条提交放大磁盘同步开销，统一在循环后提交一次。
         if results:
-            for r in results[:3]:
-                try:
+            try:
+                for r in results[:3]:
                     domain = self._infer_domain(query, r)
-                    self.record_domain_hit(r["id"], domain)
-                except Exception:
-                    pass
+                    self.record_domain_hit(r["id"], domain, commit=False)
+                self._conn().commit()
+            except Exception:
+                pass
 
         # ── Add version history to results ──────────────
         for r in results:
@@ -374,13 +392,18 @@ class SearchExtMixin:
         Simplified: we just mark them as accessed. Full domain inference
         requires knowing the query's domain context from the agent.
         """
+        if not results:
+            return
         conn = self._conn()
         now = datetime.now(timezone.utc).isoformat()
-        for r in results:
-            conn.execute(
-                "UPDATE unified_knowledge SET last_accessed = ? WHERE id = ?",
-                (now, r["id"])
-            )
+        # 单条 UPDATE 批量更新，替代逐条 UPDATE（N 次解析+写放大）
+        ids = [r["id"] for r in results]
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(
+            f"UPDATE unified_knowledge SET last_accessed = ? "
+            f"WHERE id IN ({placeholders})",
+            (now, *ids)
+        )
         conn.commit()
 
     def search_by_domain(self, domain: str, user_id: str = "default",
@@ -412,7 +435,8 @@ class SearchExtMixin:
 
     # -- Domain score update (from agent context) -----------------------------
 
-    def record_domain_hit(self, knowledge_id: int, domain: str):
+    def record_domain_hit(self, knowledge_id: int, domain: str,
+                          commit: bool = True):
         """Called when a knowledge entry is used in a domain context."""
         conn = self._conn()
         row = conn.execute(
@@ -432,6 +456,7 @@ class SearchExtMixin:
             "UPDATE unified_knowledge SET domain_scores = ?, last_query_domain = ? WHERE id = ?",
             (json.dumps(scores), domain, knowledge_id)
         )
-        conn.commit()
+        if commit:
+            conn.commit()
 
     # -- Version management ---------------------------------------------------

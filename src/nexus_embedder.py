@@ -353,13 +353,18 @@ class Reranker:
 
     def rerank(self, query: str,
                results: List[Dict[str, Any]],
-               top_k: int = 5) -> List[Dict[str, Any]]:
+               top_k: int = 5,
+               use_cross_encoder: bool = True) -> List[Dict[str, Any]]:
         """对搜索结果重排序。
 
         参数:
           query: 原查询文本
           results: 多路召回合并后的结果列表
           top_k: 返回 top-K
+          use_cross_encoder: False 时跳过模型推理，仅做基于分数的快速重排。
+              单路 FTS 模式（结果数 ≤ top_k，无物可裁剪）传 False——
+              cross-encoder predict() 约 8ms/次，占搜索总耗时的 99%，
+              而 bm25 rank 已给出排序。多路融合（hybrid）保留模型重排。
 
         返回: 重排后的结果列表 (每个 item 追加 rerank_score)
         """
@@ -386,6 +391,9 @@ class Reranker:
             r["rerank_score"] = round(score + feedback_boost + layer_boost, 4)
 
         # 2. Cross-encoder 精确重排 (若可用)
+        if not use_cross_encoder:
+            results.sort(key=lambda x: -x["rerank_score"])
+            return results[:top_k]
         self._load_cross_encoder()
         if self._model and self._model != "score_only":
             try:

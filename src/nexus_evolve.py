@@ -27,6 +27,8 @@ import sqlite3
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
+from .nexus_utils import segment_fts as _segment_fts
+
 logger = logging.getLogger(__name__)
 
 # ── 相似度计算 ─────────────────────────────────────────────
@@ -421,9 +423,10 @@ def evolve_on_write(content: str, user_id: str,
                 __import__("datetime").timezone.utc).isoformat(),
              target["target_id"])
         )
-        # Update FTS
+        # Update FTS — trigger already emptied the row, re-insert segmented
+        # content (nexus_core facade has no _segment_fts; import must be
+        # from nexus_utils)
         try:
-            from .nexus_core import _segment_fts
             seg = _segment_fts(merged)
             conn.execute(
                 "INSERT INTO knowledge_fts(knowledge_fts, rowid, content) "
@@ -450,9 +453,10 @@ def evolve_on_write(content: str, user_id: str,
                 __import__("datetime").timezone.utc).isoformat(),
              target["target_id"])
         )
-        # Update FTS
+        # Update FTS — trigger already emptied the row, re-insert segmented
+        # content (nexus_core facade has no _segment_fts; import must be
+        # from nexus_utils)
         try:
-            from .nexus_core import _segment_fts
             seg = _segment_fts(merged)
             conn.execute(
                 "INSERT INTO knowledge_fts(knowledge_fts, rowid, content) "
