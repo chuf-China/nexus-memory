@@ -34,6 +34,9 @@ def measure_write_performance(db_path: str, num_entries: int) -> Dict:
     """测量写入性能"""
     nexus = NexusCore(db_path)
 
+    # warmup: 首次写入触发 embedder 初始化（失败或成功），不计入统计
+    nexus.write("warmup entry", source_session_id="warmup")
+
     times = []
     for i in range(num_entries):
         content = f"Knowledge entry {i}: This is a test entry for benchmark purposes. "                   f"It contains some text to simulate real knowledge storage. "                   f"Entry number {i} with various keywords like Python, AI, memory, agent."
@@ -74,6 +77,10 @@ def measure_search_performance(db_path: str, num_queries: int) -> Dict:
         "machine learning",
         "natural language",
     ]
+
+    # warmup: 首次查询加载 cross-encoder（~3s），不计入统计。
+    # 必须用能命中的查询——无结果时 rerank 提前返回，模型不会加载
+    nexus.search(queries[0], limit=10)
 
     times = []
     for i in range(num_queries):
@@ -129,7 +136,12 @@ def measure_memory_usage(db_path: str) -> Dict:
 
 
 def measure_concurrent_performance(db_path: str, num_threads: int, ops_per_thread: int) -> Dict:
-    """测量并发性能"""
+    """测量并发性能
+
+    # ponytail: cross-encoder predict 为 CPU 密集且受 GIL 限制，并发无法并行
+    # 加速；有命中查询的延迟随线程数放大。若需更高并发吞吐，
+    # 升级路径：进程池并行 或 为 Reranker predict 增加 lock-free 排队。
+    """
     import concurrent.futures
     import threading
 
@@ -146,6 +158,9 @@ def measure_concurrent_performance(db_path: str, num_threads: int, ops_per_threa
     def worker(thread_id: int):
         local_nexus = NexusCore(db_path)
         times = []
+
+        # warmup: 触发任何首次加载，不计入统计
+        local_nexus.search("warmup", limit=1)
 
         for i in range(ops_per_thread):
             start = time.perf_counter()
