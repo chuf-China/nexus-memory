@@ -64,13 +64,16 @@ def expand_query(query: str) -> List[str]:
         eq = " ".join(entities)
         if eq not in queries:
             queries.append(eq)
-    # 关键词
-    from tests.eval_locomo import extract_keywords
-    keywords = extract_keywords(query, max_kw=8)
-    if keywords:
-        kw = " ".join(keywords)
-        if kw not in queries:
-            queries.append(kw)
+    # 关键词（可选：LoCoMo 评测扩展不在主仓库，缺失时跳过）
+    try:
+        from tests.eval_locomo import extract_keywords
+        keywords = extract_keywords(query, max_kw=8)
+        if keywords:
+            kw = " ".join(keywords)
+            if kw not in queries:
+                queries.append(kw)
+    except ImportError:
+        pass
     return queries[:4]
 
 
