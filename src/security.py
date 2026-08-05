@@ -279,8 +279,8 @@ try:
 
         return {**auth_info, **rate_info}
 
-except ImportError:
-    # FastAPI 未安装
+except Exception:
+    # FastAPI 未安装（APIKeyHeader 未定义抛 NameError，非 ImportError）
     pass
 
 
