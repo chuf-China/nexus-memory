@@ -59,23 +59,30 @@ class FastEmbedEngine(BaseEmbedder):
         self._load()
 
     def _load(self):
+        _fastembed_logger = None
+        old = os.environ.get("HF_HUB_OFFLINE")
+        os.environ["HF_HUB_OFFLINE"] = "1"
         try:
             from fastembed import TextEmbedding
-            import os as _os
-            # HF_HUB_OFFLINE: skip network, only use cached models
-            old = _os.environ.get("HF_HUB_OFFLINE")
-            _os.environ["HF_HUB_OFFLINE"] = "1"
             try:
-                self._model = TextEmbedding(model_name=self.model_name)
-                logger.info("Embedder: fastembed loaded %s (dim=%d)", self.model_name, self._dim)
-            finally:
-                if old is None:
-                    _os.environ.pop("HF_HUB_OFFLINE", None)
-                else:
-                    _os.environ["HF_HUB_OFFLINE"] = old
+                from loguru import logger as _flogger
+                # 离线缺模型属预期失败路径，抑制 fastembed 内部 ERROR 刷屏
+                _flogger.disable("fastembed")
+                _fastembed_logger = _flogger
+            except ImportError:
+                pass
+            self._model = TextEmbedding(model_name=self.model_name)
+            logger.info("Embedder: fastembed loaded %s (dim=%d)", self.model_name, self._dim)
         except Exception as e:
             logger.warning("Embedder: fastembed load failed: %s", e)
             self._model = None
+        finally:
+            if _fastembed_logger is not None:
+                _fastembed_logger.enable("fastembed")
+            if old is None:
+                os.environ.pop("HF_HUB_OFFLINE", None)
+            else:
+                os.environ["HF_HUB_OFFLINE"] = old
 
     @property
     def available(self) -> bool:
