@@ -200,10 +200,8 @@ async def write_knowledge(knowledge: KnowledgeWrite):
 
     result = nexus.write(
         content=knowledge.content,
-        source=knowledge.source,
-        confidence=knowledge.confidence,
-        domain=knowledge.domain,
         user_id=knowledge.user_id,
+        initial_confidence=knowledge.confidence,
     )
 
     if not result.get("success"):
@@ -230,12 +228,10 @@ async def search_knowledge(
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
-    results = nexus.search(
-        query=query,
-        limit=limit,
-        domain_filter=domain,
-        user_id=user_id,
-    )
+    if domain:
+        results = nexus.search_by_domain(domain=domain, user_id=user_id, limit=limit)
+    else:
+        results = nexus.search(query=query, user_id=user_id, limit=limit)
 
     return [
         KnowledgeResponse(
