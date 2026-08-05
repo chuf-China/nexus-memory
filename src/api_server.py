@@ -12,7 +12,7 @@ API 端点:
   GET  /knowledge/search    - 搜索知识
   GET  /knowledge/{id}      - 获取知识
   GET  /stats               - 统计信息
-  POST /consolidate         - 整合会话
+  POST /consolidate         - 整合用户知识
 """
 
 from __future__ import annotations
@@ -58,8 +58,8 @@ class KnowledgeSearch(BaseModel):
 
 
 class ConsolidateRequest(BaseModel):
-    """整合会话请求"""
-    session_id: str = Field(..., description="会话 ID")
+    """整合请求（按 user_id 整合该用户的知识）"""
+    user_id: str = Field(default="default", description="用户 ID")
 
 
 class FeedbackRequest(BaseModel):
@@ -253,25 +253,37 @@ async def get_knowledge(knowledge_id: int):
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
-    # 查询数据库
+    # 查询数据库（unified_knowledge: 无 source/confidence/domain 列，
+    # source 用 source_session_id，confidence 按层映射）
+    import json
     import sqlite3
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM knowledge WHERE id = ?", (knowledge_id,))
+    cursor.execute(
+        """SELECT id, content, domain_scores, layer, created_at, source_session_id
+           FROM unified_knowledge WHERE id = ?""",
+        (knowledge_id,)
+    )
     row = cursor.fetchone()
     conn.close()
 
     if not row:
         raise HTTPException(status_code=404, detail="Knowledge not found")
 
-    # 假设列顺序: id, content, source, confidence, domain, created_at, ...
+    try:
+        domain_scores = json.loads(row[2]) if row[2] else {}
+    except (json.JSONDecodeError, TypeError):
+        domain_scores = {}
+    domain = max(domain_scores, key=domain_scores.get) if domain_scores else "general"
+    layer_conf = {"instant": 0.40, "candidate": 0.70, "consolidated": 0.90}
+
     return KnowledgeResponse(
         id=row[0],
         content=row[1],
-        source=row[2],
-        confidence=row[3],
-        domain=row[4],
-        created_at=row[5] if len(row) > 5 else "",
+        source=row[5] or "unknown",
+        confidence=layer_conf.get(row[3], 0.40),
+        domain=domain,
+        created_at=row[4] or "",
     )
 
 
@@ -313,12 +325,12 @@ async def get_stats():
 
 @app.post("/consolidate", tags=["知识"])
 async def consolidate_session(request: ConsolidateRequest):
-    """整合会话"""
+    """整合用户知识"""
     if not nexus:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
-    nexus.consolidate(request.session_id)
-    return {"status": "success", "session_id": request.session_id}
+    nexus.consolidate(request.user_id)
+    return {"status": "success", "user_id": request.user_id}
 
 
 @app.post("/feedback", tags=["知识"])

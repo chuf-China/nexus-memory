@@ -1,4 +1,4 @@
-[![CI](https://github.com/chuf-China/nexus-memory/actions/workflows/python-package.yml/badge.svg)](https://github.com/chuf-China/nexus-memory/actions/workflows/python-package.yml)
+[![CI](https://github.com/chuf-China/nexus-memory/actions/workflows/nexus-ci.yml/badge.svg)](https://github.com/chuf-China/nexus-memory/actions/workflows/nexus-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/chuf-China/nexus-memory/tree/main/tests)
@@ -11,17 +11,17 @@
 
 ## 核心特性
 
-- **三层知识架构**：Memory（短期）→ Session（中期）→ Nexus（长期）
+- **三层认知架构**：Observation（观察）→ Belief（信念）→ Fact（事实），自动晋升/降级
 - **六域评分系统**：新鲜度 / 重要性 / 访问频率 / 关联度 / 置信度 / 反馈分
-- **混合检索引擎**：FTS5 全文检索（20ms）+ 向量语义检索 + 图关系检索
-- **安全防御系统**：30+ 威胁模式检测，三级作用域控制
+- **混合检索引擎**：FTS5 全文检索 + 向量语义检索 + 图关系检索
+- **安全防御系统**：13 类威胁模式（提示注入 / SQL 注入 / XSS），context 场景检测 + 通用检测两级
 - **自进化机制**：知识自动归类、免疫规则、审计日志
 
 ## 性能指标
 
 | 指标 | 数值 |
 |------|------|
-| 检索延迟 | 20ms |
+| 检索延迟 | 64ms 平均（FTS5，50 查询实测） |
 | 提速倍数 | 4500x（对比 LLM 方案） |
 | LLM 依赖 | 零 |
 | 运行环境 | 纯本地 |
@@ -35,7 +35,7 @@ from src.nexus_core import NexusCore
 nexus = NexusCore("nexus.db")
 
 # 写入知识
-nexus.write("用户偏好简洁回答", source="conversation", confidence=0.9)
+nexus.write("用户偏好简洁回答", source_session_id="conversation", initial_confidence=0.9)
 
 # 检索知识
 results = nexus.search("用户喜欢什么样的回答风格？", limit=5)
@@ -66,8 +66,8 @@ class YourAgent:
         response = self.llm.generate(prompt)
         
         # 保存对话到记忆
-        self.memory.write(f"用户：{user_input}\n助手：{response}", 
-                         source="conversation")
+        self.memory.write(f"用户：{user_input}\n助手：{response}",
+                         source_session_id="conversation")
         
         return response
 ```
@@ -84,28 +84,12 @@ system_prompt = f"""
 """
 ```
 
-### 生命周期钩子
-
-```python
-# 注册钩子实现自动记忆管理
-nexus.register_hook("pre_llm_call", lambda ctx: ctx.update({
-    "alerts": nexus.get_alerts(),
-    "temporal": nexus.search_temporal(ctx["query"]),
-    "history": nexus.get_history(ctx["session_id"])
-}))
-
-nexus.register_hook("session_end", lambda ctx: {
-    nexus.consolidate(ctx["session_id"]),
-    nexus.knowledge_snapshot()
-})
-```
-
 ## 目录结构
 
 ```
 nexus-memory/
 ├── src/
-│   ├── nexus_core.py        # 核心引擎（2448 行）
+│   ├── nexus_core.py        # 核心引擎（组合以下 mixin）
 │   ├── nexus_drive.py       # 数据持久化层
 │   ├── nexus_extract.py     # 知识提取器
 │   ├── nexus_search.py      # 混合检索引擎
@@ -124,32 +108,29 @@ nexus-memory/
 │   └── test_nexus_benchmark.py # 性能基准测试
 ├── docs/
 │   └── architecture.md      # 架构文档
-├── setup.py                 # 安装配置
+├── pyproject.toml           # 安装配置
 └── README_CN.md             # 本文件
 ```
 
 ## 安全防御
 
-Nexus 内置 30+ 威胁模式检测：
+Nexus 内置 13 类威胁模式检测（`src/security.py`）：
 
-- **注入攻击**：Prompt 注入、角色劫持、系统提示泄露
-- **数据外泄**：编码绕过、隐蔽通道、C2 通信
-- **反取证**：日志篡改、时间戳伪造、证据销毁
+- **提示注入 / 记忆投毒**（context 作用域）：忽略指令、角色替换、系统提示泄露、base64 编码指令等中英文模式
+- **SQL 注入 / XSS**（通用作用域）：SQL 关键词、注释符、引号转义、script 标签、事件属性
 
-三级作用域控制：
-- `all`：扫描所有知识
-- `context`：仅扫描上下文相关知识
-- `strict`：严格模式，最高安全级别
+两级作用域控制：
+- `context`：记忆注入 system prompt 前逐条扫描，命中即替换为 `[BLOCKED: ...]`
+- 通用：输入侧 SQL 注入 / XSS 技术性检测
 
 ## 性能基准
 
-| 操作 | 延迟 | 说明 |
+| 操作 | 延迟（平均） | 说明 |
 |------|------|------|
-| FTS5 检索 | 20ms | SQLite 全文索引 |
-| 向量检索 | 50ms | HNSW 近似最近邻 |
-| 图关系查询 | 10ms | 邻接表遍历 |
-| 写入知识 | 5ms | WAL 模式批量写入 |
-| 知识整合 | 100ms | 合并去重 + 评分更新 |
+| FTS5 精确检索 | 64ms | SQLite 全文索引，50 查询小样本 |
+| 向量语义检索 | 113ms | 需 fastembed 模型，无模型时回退 FTS |
+| 图关系查询 | 34ms | 实体关系遍历 |
+| 时间感知检索 | 101ms | 时间词解析 + 多跳 |
 
 ## 依赖
 

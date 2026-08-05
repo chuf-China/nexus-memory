@@ -6,8 +6,7 @@
 
 **Local-first memory system. Zero LLM dependency for core operations.**
 
-[![CI](https://github.com/chuf-China/nexus-memory/actions/workflows/python-package.yml/badge.svg)](https://github.com/chuf-China/nexus-memory/actions/workflows/python-package.yml)
-[![PyPI](https://img.shields.io/pypi/v/nexus-agent-memory?color=CB3837&label=PyPI&logo=pypi)](https://pypi.org/project/nexus-agent-memory/)
+[![CI](https://github.com/chuf-China/nexus-memory/actions/workflows/nexus-ci.yml/badge.svg)](https://github.com/chuf-China/nexus-memory/actions/workflows/nexus-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
@@ -31,7 +30,7 @@ from src.nexus_core import NexusCore
 nexus = NexusCore("nexus.db")
 
 # One line to remember
-nexus.write("User prefers Python type hints", source="conversation", confidence=0.9)
+nexus.write("User prefers Python type hints", source_session_id="conversation", initial_confidence=0.9)
 
 # One line to recall
 results = nexus.search("What coding style does the user prefer?", limit=5)
@@ -42,11 +41,7 @@ system_prompt = f"You are helpful.\n{nexus.system_prompt_block()}"
 
 ## Install
 
-```bash
-pip install nexus-agent-memory
-```
-
-Or from source:
+From source:
 
 ```bash
 git clone https://github.com/chuf-China/nexus-memory.git
@@ -54,18 +49,7 @@ cd nexus-memory
 pip install -e .
 ```
 
-### Optional Dependencies
-
-```bash
-# For vector search
-pip install nexus-agent-memory[vector]
-
-# For LLM integration
-pip install nexus-agent-memory[llm]
-
-# Full installation
-pip install nexus-agent-memory[full]
-```
+Optional extras (defined in `pyproject.toml`): `[vector]` for fastembed/hnswlib, `[llm]` for LLM integration, `[full]` for everything.
 
 ## Quick Start
 
@@ -89,23 +73,8 @@ class YourAgent:
         response = self.llm.generate(prompt)
         
         # Auto-save conversation
-        self.memory.write(f"Q: {user_input}\nA: {response}", source="conversation")
+        self.memory.write(f"Q: {user_input}\nA: {response}", source_session_id="conversation")
         return response
-```
-
-### Lifecycle Hooks
-
-```python
-nexus.register_hook("pre_llm_call", lambda ctx: ctx.update({
-    "alerts": nexus.get_alerts(),
-    "temporal": nexus.search_temporal(ctx["query"]),
-    "history": nexus.get_history(ctx["session_id"])
-}))
-
-nexus.register_hook("session_end", lambda ctx: {
-    nexus.consolidate(ctx["session_id"]),
-    nexus.knowledge_snapshot()
-})
 ```
 
 ## CLI
@@ -125,22 +94,21 @@ from src.nexus_core import NexusCore
 nexus = NexusCore("nexus.db")
 
 # Write
-nexus.write(content, source="conversation", confidence=0.9, domain="workflow")
+nexus.write(content, source_session_id="conversation", initial_confidence=0.9)
 
 # Search
-results = nexus.search(query, limit=5, domain_filter=None)
+results = nexus.search(query, limit=5)
+# Search by domain (instead of a domain_filter parameter)
+results = nexus.search_by_domain(domain="workflow", limit=5)
 
-# System prompt injection
+# System prompt injection (with built-in threat scanning)
 block = nexus.system_prompt_block()
 
-# Consolidate session
-nexus.consolidate(session_id)
+# Consolidate user knowledge
+nexus.consolidate(user_id="default")
 
 # Knowledge snapshot
 nexus.knowledge_snapshot()
-
-# Register lifecycle hooks
-nexus.register_hook(event_name, callback)
 
 # Get alerts
 alerts = nexus.get_alerts()
@@ -148,8 +116,8 @@ alerts = nexus.get_alerts()
 # Temporal search
 results = nexus.search_temporal(query)
 
-# Session history
-history = nexus.get_history(session_id)
+# Knowledge version history
+history = nexus.get_history(knowledge_id)
 ```
 
 ## Architecture
@@ -187,7 +155,7 @@ history = nexus.get_history(session_id)
 | Layer | Confidence | Behavior |
 |-------|------------|----------|
 | Observation | 0.30 - 0.50 | Raw signal, first appearance |
-| Belief | 0.70 - 0.85 | Multiple confirmations, emerging pattern |
+| Belief | 0.50 - 0.85 | Multiple confirmations, emerging pattern |
 | Fact | 0.85 + | High confidence, persistent knowledge |
 
 - **Auto-promote**: Same pattern ≥3 times OR user confirmation
@@ -210,10 +178,18 @@ Every knowledge entry is scored on: Freshness · Importance · Frequency · Rele
 ```
 nexus-memory/
 ├── src/
-│   ├── nexus_core.py          # Core engine
+│   ├── nexus_core.py          # Core engine (composes the mixins below)
+│   ├── nexus_core_write.py    # Write / belief / conflict-detection mixin
+│   ├── nexus_core_stats.py    # Stats / consolidate / system-prompt mixin
+│   ├── nexus_core_search_ext.py # Hybrid search mixin
+│   ├── nexus_core_db.py       # DB init & schema mixin
+│   ├── nexus_core_audit.py    # Audit / temporal mixin
+│   ├── nexus_core_session.py  # Cross-session identity mixin
+│   ├── nexus_core_snapshot.py # Snapshot mixin
+│   ├── security.py            # Threat scanning, API keys, rate limiting
 │   ├── nexus_drive.py         # Data persistence layer
 │   ├── nexus_extract.py       # Knowledge extractor
-│   ├── nexus_search.py        # Hybrid search engine
+│   ├── nexus_search.py        # Enhanced recall (expansion, negation)
 │   ├── nexus_embedder.py      # Vector embedding (optional)
 │   ├── nexus_hnsw.py          # HNSW index (optional)
 │   ├── nexus_graph.py         # Graph relationship
@@ -225,8 +201,11 @@ nexus-memory/
 │   ├── nexus_local.py         # Local storage
 │   └── nexus_utils.py         # Utility functions
 ├── tests/
-│   ├── test_nexus_core.py     # Core tests
-│   └── test_nexus_benchmark.py # Performance benchmarks
+│   ├── test_all_modules.py    # Module integration tests
+│   ├── test_core_extended.py  # Extended core tests
+│   ├── test_security_scan.py  # Threat scanning tests
+│   ├── test_benchmark_v2.py   # Performance benchmarks
+│   └── test_*.py              # Core / utils / benchmark tests
 ├── docs/
 │   └── architecture.md        # Architecture documentation
 ├── pyproject.toml             # PyPI packaging
@@ -251,7 +230,7 @@ nexus-memory/
 
 ```bash
 # Install dev dependencies
-pip install nexus-agent-memory[dev]
+pip install -e ".[dev]"
 
 # Run tests
 python -m pytest tests/ -v

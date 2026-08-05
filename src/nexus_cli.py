@@ -72,15 +72,18 @@ def status(ctx: click.Context):
         cursor = conn.cursor()
 
         # Count knowledge entries
-        cursor.execute("SELECT COUNT(*) FROM knowledge")
+        cursor.execute("SELECT COUNT(*) FROM unified_knowledge WHERE status = 'active'")
         total_count = cursor.fetchone()[0]
 
-        # Count by source
-        cursor.execute("SELECT source, COUNT(*) FROM knowledge GROUP BY source")
+        # Count by source session
+        cursor.execute(
+            "SELECT COALESCE(source_session_id, 'unknown'), COUNT(*) "
+            "FROM unified_knowledge GROUP BY source_session_id"
+        )
         source_counts = dict(cursor.fetchall())
 
-        # Count by domain
-        cursor.execute("SELECT domain, COUNT(*) FROM knowledge GROUP BY domain")
+        # Count by layer
+        cursor.execute("SELECT layer, COUNT(*) FROM unified_knowledge GROUP BY layer")
         domain_counts = dict(cursor.fetchall())
 
         # Database size
@@ -88,7 +91,7 @@ def status(ctx: click.Context):
         db_size_mb = db_size / (1024 * 1024)
 
         # Last write time
-        cursor.execute("SELECT MAX(created_at) FROM knowledge")
+        cursor.execute("SELECT MAX(created_at) FROM unified_knowledge")
         last_write = cursor.fetchone()[0]
 
         click.echo(f"Database: {db_path}")
@@ -97,12 +100,12 @@ def status(ctx: click.Context):
         click.echo(f"Last write: {last_write}")
 
         if source_counts:
-            click.echo("\nBy source:")
+            click.echo("\nBy session:")
             for source, count in sorted(source_counts.items(), key=lambda x: -x[1]):
                 click.echo(f"  {source}: {count}")
 
         if domain_counts:
-            click.echo("\nBy domain:")
+            click.echo("\nBy layer:")
             for domain, count in sorted(domain_counts.items(), key=lambda x: -x[1]):
                 click.echo(f"  {domain}: {count}")
 
@@ -124,7 +127,10 @@ def search(ctx: click.Context, query: str, limit: int, domain: Optional[str]):
     from src.nexus_core import NexusCore
 
     nexus = NexusCore(str(db_path))
-    results = nexus.search(query, limit=limit, domain_filter=domain)
+    if domain:
+        results = nexus.search_by_domain(domain=domain, limit=limit)
+    else:
+        results = nexus.search(query, limit=limit)
 
     if not results:
         click.echo("No results found.")
@@ -133,12 +139,11 @@ def search(ctx: click.Context, query: str, limit: int, domain: Optional[str]):
     click.echo(f"Found {len(results)} results:\n")
     for i, result in enumerate(results, 1):
         content = result.get("content", "")
-        score = result.get("score", 0)
-        source = result.get("source", "unknown")
-        domain = result.get("domain", "general")
+        layer = result.get("layer", "instant")
+        user = result.get("user_id") or "unknown"
 
-        click.echo(f"{i}. [{domain}] {content[:100]}...")
-        click.echo(f"   Score: {score:.3f} | Source: {source}")
+        click.echo(f"{i}. [{layer}] {content[:100]}...")
+        click.echo(f"   User: {user}")
         click.echo()
 
 
@@ -152,7 +157,7 @@ def export(ctx: click.Context, output: str):
 
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM knowledge")
+        cursor.execute("SELECT * FROM unified_knowledge")
         columns = [description[0] for description in cursor.description]
         rows = cursor.fetchall()
 
@@ -172,11 +177,9 @@ def export(ctx: click.Context, output: str):
 
 @cli.command()
 @click.argument("content")
-@click.option("--source", "-s", default="cli", help="Source of knowledge")
-@click.option("--confidence", "-c", default=0.8, help="Confidence score (0-1)")
-@click.option("--domain", "-d", default="general", help="Knowledge domain")
+@click.option("--confidence", "-c", default=0.8, help="Initial confidence score (0-1)")
 @click.pass_context
-def write(ctx: click.Context, content: str, source: str, confidence: float, domain: str):
+def write(ctx: click.Context, content: str, confidence: float):
     """Write knowledge to the database."""
     db_path = ctx.obj["db_path"]
 
@@ -185,9 +188,9 @@ def write(ctx: click.Context, content: str, source: str, confidence: float, doma
     from src.nexus_core import NexusCore
 
     nexus = NexusCore(str(db_path))
-    nexus.write(content, source=source, confidence=confidence, domain=domain)
+    nexus.write(content, source_session_id="cli", initial_confidence=confidence)
 
-    click.echo(f"✓ Written to {domain}: {content[:50]}...")
+    click.echo(f"✓ Written (confidence={confidence}): {content[:50]}...")
 
 
 @cli.command()
@@ -210,7 +213,7 @@ def benchmark(ctx: click.Context, iterations: int):
     for i in range(iterations):
         start = time.time()
         nexus.write(f"Benchmark entry {i}: This is test content for performance measurement.",
-                   source="benchmark", confidence=0.5)
+                   source_session_id="benchmark", initial_confidence=0.5)
         write_times.append(time.time() - start)
 
     # Search benchmark
