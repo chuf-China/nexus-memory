@@ -139,9 +139,9 @@ class InputValidator:
 
     # SQL 注入模式
     SQL_INJECTION_PATTERNS = [
-        r"((union|select|insert|update|delete|drop|alter))",
+        r"(\b(union|select|insert|update|delete|drop|alter)\b)",
         r"(--|;|/\*|\*/)",
-        r"((or|and)\s+\d+\s*=\s*\d+)",
+        r"(\b(or|and)\b\s+\d+\s*=\s*\d+)",
         r"""('|"|\\)""",
     ]
 
@@ -285,6 +285,34 @@ except ImportError:
 
 
 # ============ 工具函数 ============
+
+# ── 提示注入 / 记忆投毒模式（scope="context": 记忆注入 system prompt 前）──
+CONTEXT_THREAT_PATTERNS: List[str] = [
+    r"忽略\s*(上面|以上|以下|之前)?\s*(所有)?\s*(的)?\s*(指令|指示|规则|设定|内容)",
+    r"(ignore|disregard|forget)\s+(all\s+)?(previous|above|prior)?\s*(instructions?|prompts?|rules?|system)",
+    r"你现在(是|扮演|变成|成为).{0,15}(另一个|别的|其他).{0,15}(助手|ai|模型)",
+    r"(system|developer|user)\s*[:：]\s*(role|instruction|task)",
+    r"base64.{0,20}(decode|解码)",
+    r"不要(告诉|提及|提到).{0,15}(系统|system)",
+]
+
+
+def scan_for_threats(content: str, scope: str = "context") -> List[str]:
+    """检测内容中的威胁模式，返回命中描述列表；空列表 = 安全。
+
+    scope='context'（默认）: 记忆注入 system prompt 前的提示注入/投毒检测
+    其他 scope:            SQL 注入 / XSS 技术性检测
+    """
+    if not content:
+        return []
+    patterns = (CONTEXT_THREAT_PATTERNS if scope == "context"
+                else InputValidator.SQL_INJECTION_PATTERNS + InputValidator.XSS_PATTERNS)
+    hits = []
+    for p in patterns:
+        if re.search(p, content, re.IGNORECASE):
+            hits.append(p)
+    return hits
+
 
 def hash_password(password: str) -> str:
     """哈希密码"""

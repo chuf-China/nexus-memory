@@ -20,10 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-try:
-    from tools.threat_patterns import scan_for_threats as _scan_for_threats
-except ImportError:
-    _scan_for_threats = None
+from .security import scan_for_threats as _scan_for_threats
 
 try:
     from .nexus_local import get_client as _get_llm_client
