@@ -21,7 +21,7 @@
 
 | 指标 | 数值 |
 |------|------|
-| 检索延迟 | 3.5ms 平均（FTS5 稳态）；10.9ms（50 查询实测，含重排序） |
+| 检索延迟 | 0.10ms（FTS5，2000 条语料实测）；0.58ms（hybrid 融合） |
 | LLM 依赖 | 零（检索纯本地） |
 | 运行环境 | 纯本地 |
 
@@ -88,27 +88,38 @@ system_prompt = f"""
 ```
 nexus-memory/
 ├── src/
-│   ├── nexus_core.py        # 核心引擎（组合以下 mixin）
-│   ├── nexus_drive.py       # 数据持久化层
-│   ├── nexus_extract.py     # 知识提取器
-│   ├── nexus_search.py      # 混合检索引擎
-│   ├── nexus_embedder.py    # 向量嵌入
-│   ├── nexus_hnsw.py        # HNSW 索引
-│   ├── nexus_graph.py       # 图关系存储
-│   ├── nexus_belief.py      # 信念网络
-│   ├── nexus_constitution.py # 安全防御系统
-│   ├── nexus_evolve.py      # 自进化机制
-│   ├── nexus_miner.py       # 知识挖掘
-│   ├── nexus_cli.py         # 命令行工具
-│   ├── nexus_local.py       # 本地存储
-│   └── nexus_utils.py       # 工具函数
+│   ├── nexus_core.py          # 核心引擎（组合以下 mixin）
+│   ├── nexus_core_write.py    # 写入 / 信念 / 冲突检测 mixin
+│   ├── nexus_core_stats.py    # 统计 / 合并 / system prompt mixin
+│   ├── nexus_core_search_ext.py # 混合检索 mixin
+│   ├── nexus_core_db.py       # 数据库初始化与 schema mixin
+│   ├── nexus_core_audit.py    # 审计 / 时间感知 mixin
+│   ├── nexus_core_session.py  # 跨会话身份 mixin
+│   ├── nexus_core_snapshot.py # 快照 mixin
+│   ├── security.py            # 威胁扫描、API key、限流
+│   ├── nexus_drive.py         # 数据持久化层
+│   ├── nexus_extract.py       # 知识提取器
+│   ├── nexus_search.py        # 增强召回（扩展、否定）
+│   ├── nexus_embedder.py      # 向量嵌入（可选）
+│   ├── nexus_hnsw.py          # HNSW 索引（可选）
+│   ├── nexus_graph.py         # 图关系存储
+│   ├── nexus_belief.py        # 信念网络（三层晋升）
+│   ├── nexus_constitution.py  # 安全防御系统
+│   ├── nexus_evolve.py        # 自进化机制（老化 + 合并）
+│   ├── nexus_miner.py         # 知识挖掘
+│   ├── nexus_cli.py           # 命令行工具
+│   ├── nexus_local.py         # 本地存储
+│   └── nexus_utils.py         # 工具函数
 ├── tests/
-│   ├── test_nexus_core.py   # 核心测试
-│   └── test_nexus_benchmark.py # 性能基准测试
+│   ├── test_all_modules.py    # 模块集成测试
+│   ├── test_core_extended.py  # 扩展核心测试
+│   ├── test_security_scan.py  # 威胁扫描测试
+│   ├── test_benchmark_v2.py   # 性能基准测试
+│   └── test_*.py              # 核心 / 工具 / 基准测试
 ├── docs/
-│   └── architecture.md      # 架构文档
-├── pyproject.toml           # 安装配置
-└── README_CN.md             # 本文件
+│   └── architecture.md        # 架构文档
+├── pyproject.toml             # 安装配置
+└── README_CN.md               # 本文件
 ```
 
 ## 安全防御
@@ -126,7 +137,8 @@ Nexus 内置 13 类威胁模式检测（`src/security.py`）：
 
 | 操作 | 延迟（平均） | 说明 |
 |------|------|------|
-| FTS5 精确检索 | 10.9ms | SQLite 全文索引，50 查询实测（P95 28ms） |
+| FTS5 精确检索 | 0.10ms | SQLite 全文索引，2000 条语料实测（修复前 11ms，110x；结果 ≤ limit 时跳过模型重排） |
+| hybrid 融合检索 | 0.58ms | FTS + 向量 + 图多路召回合并重排（2000 条语料实测） |
 | 向量语义检索 | 23.4ms | 需 fastembed 模型，无模型时回退 FTS |
 | 图关系查询 | 8.6ms | 实体关系遍历 |
 | 时间感知检索 | 19.7ms | 时间词解析 + 多跳 |

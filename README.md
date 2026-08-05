@@ -169,9 +169,10 @@ Every knowledge entry is scored on: Freshness · Importance · Frequency · Rele
 ### Search Capabilities
 
 - **FTS5 Full-Text** — SQLite native full-text index
+- **CJK-Aware Queries** — OR-semantics matching with unigram pruning; multi-character Chinese queries recall correctly instead of silently returning zero results
 - **Vector Search** — HNSW approximate nearest neighbor (optional)
 - **Temporal Search** — Time-aware retrieval
-- **Cross-Encoder Reranking** — Final relevance scoring
+- **Cross-Encoder Reranking** — Final relevance scoring (skipped when results ≤ limit, where no pruning is possible)
 
 ## Directory Structure
 
