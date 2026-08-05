@@ -29,10 +29,9 @@ try:
     from fastapi import FastAPI, HTTPException, Query
     from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel, Field
-    import uvicorn
 except ImportError:
-    print("Error: FastAPI and uvicorn are required for REST API.")
-    print("Install with: pip install fastapi uvicorn")
+    print("Error: FastAPI and pydantic are required for REST API.")
+    print("Install with: pip install fastapi pydantic")
     sys.exit(1)
 
 from src.nexus_core import NexusCore
@@ -370,6 +369,7 @@ async def get_system_prompt(
 def main():
     """启动服务器"""
     import argparse
+    import uvicorn  # 仅运行服务器时所需，模块导入不依赖
 
     parser = argparse.ArgumentParser(description="Nexus Memory REST API")
     parser.add_argument("--host", default="127.0.0.1", help="绑定地址 (默认: 127.0.0.1)")
