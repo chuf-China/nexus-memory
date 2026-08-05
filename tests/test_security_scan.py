@@ -61,6 +61,14 @@ def test_word_boundary_no_false_positive():
     assert scan_for_threats("deselect the option", scope="input") == []
 
 
+def test_plain_english_sql_words_no_false_positive():
+    # 组合模式验证：普通英文中的 select/delete/update 单词不命中，
+    # 需构成 SQL 语句特征（select...from、delete from 等）才拦截
+    assert scan_for_threats("Please select an option from the menu", scope="input") == []
+    assert scan_for_threats("delete all old files", scope="input") == []
+    assert scan_for_threats("update the document", scope="input") == []
+
+
 def test_empty_content_safe():
     assert scan_for_threats("") == []
 

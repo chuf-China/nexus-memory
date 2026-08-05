@@ -11,8 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python deps
+# plugins/memory/nexus/schema.sql 不在 src 包内（nexus_core_db 从
+# <root>/plugins/... 路径加载），必须单独复制，否则容器内建库无 schema
 COPY pyproject.toml .
 COPY src/ src/
+COPY plugins/ plugins/
 RUN pip install --no-cache-dir -e ".[full]"
 
 # Data directory

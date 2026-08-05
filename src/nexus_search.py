@@ -19,6 +19,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+from .nexus_utils import extract_keywords
+
 logger = logging.getLogger(__name__)
 
 # ── 正则 ──────────────────────────────────────────────────
@@ -64,16 +66,13 @@ def expand_query(query: str) -> List[str]:
         eq = " ".join(entities)
         if eq not in queries:
             queries.append(eq)
-    # 关键词（可选：LoCoMo 评测扩展不在主仓库，缺失时跳过）
-    try:
-        from tests.eval_locomo import extract_keywords
-        keywords = extract_keywords(query, max_kw=8)
-        if keywords:
-            kw = " ".join(keywords)
-            if kw not in queries:
-                queries.append(kw)
-    except ImportError:
-        pass
+    # 关键词（本地实现；tests.eval_locomo 不在主仓库，原外部依赖
+    # 由 nexus_utils.extract_keywords 替代）
+    keywords = extract_keywords(query, max_kw=8)
+    if keywords:
+        kw = " ".join(keywords)
+        if kw not in queries:
+            queries.append(kw)
     return queries[:4]
 
 

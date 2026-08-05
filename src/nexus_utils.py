@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
@@ -191,3 +192,62 @@ def max_domain(scores: Dict[str, int]) -> Tuple[Optional[str], int]:
             best_val = v
             best = k
     return best, best_val
+
+
+def _tokenize(text: str) -> List[str]:
+    """Split into lowercased alphanumeric tokens (CJK chars as unigrams)."""
+    text = text.lower()
+    tokens = []
+    buf = []
+    for ch in text:
+        if ch.isalnum():
+            buf.append(ch)
+        else:
+            if buf:
+                word = "".join(buf)
+                # Split CJK into unigrams
+                if any("一" <= c <= "鿿" for c in word):
+                    tokens.extend(word)
+                else:
+                    tokens.append(word)
+                buf = []
+    if buf:
+        word = "".join(buf)
+        if any("一" <= c <= "鿿" for c in word):
+            tokens.extend(word)
+        else:
+            tokens.append(word)
+    return tokens
+
+
+def extract_keywords(text: str, max_kw: int = 5) -> List[str]:
+    """提取 top-N 关键词（CJK 单字 + 英文词，去 stopword，按频率）。
+
+    原为 nexus_evolve 的私有 _extract_keywords；提升为公共工具后，
+    nexus_search.expand_query 的 LoCoMo 外部依赖（tests.eval_locomo
+    不在主仓库）替换为本地实现。
+    """
+    tokens = _tokenize(text)
+    stop = {"的", "了", "是", "在", "有", "和", "就", "不", "也", "都",
+            "这", "那", "对", "被", "把", "the", "a", "an", "is", "are",
+            "it", "this", "that", "to", "for", "with", "on", "at", "by"}
+    # CJK characters are valid even at length 1
+    keywords = []
+    for t in tokens:
+        is_cjk = len(t) == 1 and '一' <= t <= '鿿'
+        if is_cjk and t.lower() not in stop:
+            keywords.append(t)
+        elif len(t) >= 2 and t.lower() not in stop:
+            keywords.append(t)
+    # Count frequency, take top N
+    freq = Counter(keywords)
+    # For CJK, prefer non-adjacent characters for coverage
+    deduped = []
+    seen = set()
+    for k, _ in freq.most_common(max_kw * 3):
+        if k not in seen:
+            seen.add(k)
+            deduped.append(k)
+            if len(deduped) >= max_kw:
+                break
+    return deduped

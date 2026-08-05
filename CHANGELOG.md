@@ -51,6 +51,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   不可被语义搜索命中。增加行数指纹过期检测，build() 自动重建。
 - 冗余的双 `@staticmethod` 装饰器。
 
+### Fixed（2026-08-06 复测报告次要问题）
+- **SQLi 检测误报**：`InputValidator.SQL_INJECTION_PATTERNS` 原以单关键词
+  （union/select/insert/update/delete/drop/alter）任意出现即命中，含 "select"
+  的普通英文全部误报。改为组合语句特征（union select / select * from /
+  insert into / delete from / drop table / alter table / update...set / 注释符 /
+  真值恒等式 / 引号）。取舍：`SELECT 列名 FROM` 与英文句式 "select X from Y"
+  语法同构无法无损区分，单语句 SELECT 依赖分号/引号等堆叠注入信号覆盖。
+- **expand_query 死依赖**：`from tests.eval_locomo import extract_keywords`
+  （该模块不在主仓库，导入必失败，try/except 永远吞错）。将 `_extract_keywords`
+  提升为 `nexus_utils.extract_keywords` 公共函数，nexus_evolve 与 nexus_search
+  共用，删除死分支。
+- **Dockerfile 缺 plugins/**：schema.sql 仅存在于 `<root>/plugins/memory/nexus/`，
+  nexus_core_db / nexus_core_stats 均从该路径加载，容器只 COPY src/ 导致建库
+  无 schema。补 `COPY plugins/ plugins/`。
+
 ### Changed
 - **FTS5 查询改 OR 语义**：原实现把 unigram+bigram 分词串直接喂 MATCH（隐式 AND），
   ≥4-5 字中文查询召回为 0，检索退化为 LIKE 全表扫描。新增 `fts_or_query()`，

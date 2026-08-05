@@ -24,10 +24,13 @@ from __future__ import annotations
 import logging
 import re
 import sqlite3
-from collections import Counter
 from typing import Any, Dict, List, Optional
 
-from .nexus_utils import segment_fts as _segment_fts
+from .nexus_utils import (
+    _tokenize,
+    extract_keywords as _extract_keywords,
+    segment_fts as _segment_fts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,32 +65,6 @@ def _jaccard_similarity(a: str, b: str) -> float:
     if not a_tokens or not b_tokens:
         return 0.0
     return len(a_tokens & b_tokens) / len(a_tokens | b_tokens)
-
-
-def _tokenize(text: str) -> List[str]:
-    """Split into lowercased alphanumeric tokens (CJK chars as unigrams)."""
-    text = text.lower()
-    tokens = []
-    buf = []
-    for ch in text:
-        if ch.isalnum():
-            buf.append(ch)
-        else:
-            if buf:
-                word = "".join(buf)
-                # Split CJK into unigrams
-                if any("\u4e00" <= c <= "\u9fff" for c in word):
-                    tokens.extend(word)
-                else:
-                    tokens.append(word)
-                buf = []
-    if buf:
-        word = "".join(buf)
-        if any("\u4e00" <= c <= "\u9fff" for c in word):
-            tokens.extend(word)
-        else:
-            tokens.append(word)
-    return tokens
 
 
 def _has_negation(text: str) -> bool:
@@ -362,33 +339,6 @@ def _content_hash(content: str) -> str:
     text = content.strip().lower()
     text = re.sub(r'\s+', ' ', text)
     return hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
-
-
-def _extract_keywords(text: str, max_kw: int = 5) -> List[str]:
-    tokens = _tokenize(text)
-    stop = {"的", "了", "是", "在", "有", "和", "就", "不", "也", "都",
-            "这", "那", "对", "被", "把", "the", "a", "an", "is", "are",
-            "it", "this", "that", "to", "for", "with", "on", "at", "by"}
-    # CJK characters are valid even at length 1
-    keywords = []
-    for t in tokens:
-        is_cjk = len(t) == 1 and '\u4e00' <= t <= '\u9fff'
-        if is_cjk and t.lower() not in stop:
-            keywords.append(t)
-        elif len(t) >= 2 and t.lower() not in stop:
-            keywords.append(t)
-    # Count frequency, take top N
-    freq = Counter(keywords)
-    # For CJK, prefer non-adjacent characters for coverage
-    deduped = []
-    seen = set()
-    for k, _ in freq.most_common(max_kw * 3):
-        if k not in seen:
-            seen.add(k)
-            deduped.append(k)
-            if len(deduped) >= max_kw:
-                break
-    return deduped
 
 
 # ── 集成入口 ───────────────────────────────────────────────

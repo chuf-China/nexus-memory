@@ -136,12 +136,19 @@ class RateLimiter:
 class InputValidator:
     """威胁模式定义（SQL/XSS），供 scan_for_threats 的 technical scope 使用"""
 
-    # SQL 注入模式
+    # SQL 注入模式（组合语句特征，而非单关键词——"Please select an option"
+    # 这类含 select 的普通英文不应命中）。
+    # 取舍：`SELECT 列名 FROM` 与英文句式 "select X from Y" 语法同构，
+    # 无法无损区分，不单独拦截；单语句 SELECT 依赖分号/引号等堆叠注入
+    # 信号覆盖，`select * from`（select 后直接通配符，英文不会自然出现）保留。
     SQL_INJECTION_PATTERNS = [
-        r"(\b(union|select|insert|update|delete|drop|alter)\b)",
-        r"(--|;|/\*|\*/)",
-        r"(\b(or|and)\b\s+\d+\s*=\s*\d+)",
-        r"""('|"|\\)""",
+        r"\b(union\s+(all\s+)?select)\b",   # UNION SELECT 联合注入
+        r"\bselect\s+\*\s+from\b",           # SELECT * FROM
+        r"\b(insert\s+into|delete\s+from|drop\s+table|alter\s+table)\b",
+        r"\bupdate\b\s+\w+\s+set\b",         # UPDATE ... SET 语句
+        r"(--|;|/\*|\*/)",                   # 注释符 / 分号
+        r"(\b(or|and)\b\s+\d+\s*=\s*\d+)",  # 真值恒等式
+        r"""('|"|\\)""",                     # 引号 / 反斜杠
     ]
 
     # XSS 模式
