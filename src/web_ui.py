@@ -23,12 +23,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from fastapi import FastAPI, Request, Query
-    from fastapi.responses import HTMLResponse, JSONResponse
-    from fastapi.staticfiles import StaticFiles
-    from fastapi.templating import Jinja2Templates
+    from fastapi.responses import HTMLResponse
 except ImportError:
-    print("Error: FastAPI and Jinja2 are required for Web UI.")
-    print("Install with: pip install fastapi jinja2")
+    print("Error: FastAPI is required for Web UI.")
+    print("Install with: pip install fastapi")
     sys.exit(1)
 
 from src.nexus_core import NexusCore
