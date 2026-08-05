@@ -89,9 +89,9 @@ When you say "that's wrong, I actually prefer Go":
 
 | Feature | Nexus Memory | agentmemory | mem0 |
 |---------|:-:|:-:|:-:|
-| Prompt injection detection | ✅ 16 patterns (6 prompt injection + 7 SQLi + 3 XSS) | ❌ | ❌ |
+| Prompt injection detection | ✅ 13 patterns (6 prompt injection + 4 SQLi + 3 XSS) | ❌ | ❌ |
 | Role hijacking detection | ✅ | ❌ | ❌ |
-| Scope control (3-tier) | ✅ all/context/strict | ❌ | ❌ |
+| Scope control (2-tier) | ✅ context/input | ❌ | ❌ |
 | Audit logging | ✅ | ❌ | ❌ |
 | Anti-forensics detection | ✅ | ❌ | ❌ |
 
@@ -137,7 +137,7 @@ When you say "that's wrong, I actually prefer Go":
 
 ### Choose Nexus Memory if:
 - You want transparent memory quality (per-domain scoring, belief lifecycle, auto-aging)
-- You need security (16 threat patterns, context-scope scanning)
+- You need security (13 threat patterns, context-scope scanning)
 - Your agent is Python-based
 - You want zero external services
 

@@ -344,11 +344,11 @@ async def get_stats():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM knowledge WHERE is_archived = 0")
+    cursor.execute("SELECT COUNT(*) FROM unified_knowledge WHERE status != 'archived'")
     total = cursor.fetchone()[0]
 
-    cursor.execute("SELECT domain, COUNT(*) FROM knowledge WHERE is_archived = 0 GROUP BY domain")
-    by_domain = dict(cursor.fetchall())
+    cursor.execute("SELECT last_query_domain, COUNT(*) FROM unified_knowledge WHERE status != 'archived' GROUP BY last_query_domain")
+    by_domain = {k or "unknown": v for k, v in cursor.fetchall()}
 
     conn.close()
 
@@ -372,7 +372,10 @@ async def search_knowledge(
     if not nexus:
         return {"results": [], "total": 0}
 
-    results = nexus.search(q, limit=limit + offset, domain_filter=domain)
+    if domain:
+        results = nexus.search_by_domain(domain=domain, user_id="default", limit=limit + offset)
+    else:
+        results = nexus.search(q, limit=limit + offset)
     results = results[offset:offset + limit]
 
     return {"results": results, "total": len(results)}
@@ -386,7 +389,6 @@ async def write_knowledge(request: Request):
 
     data = await request.json()
     content = data.get("content")
-    domain = data.get("domain", "general")
     source = data.get("source", "web_ui")
     confidence = data.get("confidence", 0.8)
 
@@ -395,9 +397,8 @@ async def write_knowledge(request: Request):
 
     result = nexus.write(
         content=content,
-        source=source,
-        confidence=confidence,
-        domain=domain,
+        source_session_id=source,
+        initial_confidence=confidence,
     )
 
     return result

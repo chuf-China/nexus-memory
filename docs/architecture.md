@@ -128,33 +128,31 @@ Nexus Memory 是一个为 AI Agent 设计的跨会话持久化记忆系统。它
 
 ## 数据模型
 
-### knowledge 表
+### unified_knowledge 表（实际 schema）
 
 ```sql
-CREATE TABLE knowledge (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    content TEXT NOT NULL,
-    content_hash TEXT NOT NULL,
-    source TEXT DEFAULT 'unknown',
-    confidence REAL DEFAULT 0.5,
-    domain TEXT DEFAULT 'general',
-    user_id TEXT DEFAULT 'default',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    access_count INTEGER DEFAULT 0,
-    last_accessed TIMESTAMP,
-    is_archived BOOLEAN DEFAULT 0
-);
-
--- FTS5 全文索引
-CREATE VIRTUAL TABLE knowledge_fts USING fts5(
-    content,
-    content=knowledge,
-    content_rowid=id
+CREATE TABLE unified_knowledge (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    content           TEXT NOT NULL,
+    domain_scores     TEXT NOT NULL DEFAULT '{}',   -- JSON: 6 域评分（原文档的 domain 列）
+    layer             TEXT NOT NULL DEFAULT 'instant',  -- instant/candidate/consolidated
+    positive_feedback INTEGER DEFAULT 0,
+    negative_feedback INTEGER DEFAULT 0,
+    source_session_id TEXT,                          -- 来源会话（原文档的 source 列）
+    status            TEXT DEFAULT 'active',         -- active/superseded/archived（原 is_archived 列）
+    user_id           TEXT DEFAULT 'default',
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-### belief 表
+完整 DDL（含 FTS5 虚拟表、索引与触发器）见 `plugins/memory/nexus/schema.sql`。
+其他运行时表：`knowledge_versions`（版本历史）、`feedback_log`、`entity_relations`（实体图）、`knowledge_beliefs`（信念网络）、`knowledge_embeddings`（向量）。
+
+### belief 表（未实现）
+
+> ⚠️ 下方为早期设计稿，代码中不存在 `belief` 表。信念网络实际使用
+> `knowledge_beliefs` 表（`nexus_belief.py` 初始化时创建）。
 
 ```sql
 CREATE TABLE belief (
@@ -169,7 +167,9 @@ CREATE TABLE belief (
 );
 ```
 
-### events 表
+### events 表（未实现）
+
+> ⚠️ `events` 表未实现，代码中无对应表；交互审计使用 `interaction_log`。
 
 ```sql
 CREATE TABLE events (
@@ -330,6 +330,12 @@ volumes:
 ```
 
 ## 性能优化
+
+> ⚠️ **以下 API 均为规划中设计，当前版本未实现**：`transaction()`、`pool_size`/
+> `cache_size` 构造参数、`AsyncNexusCore`、`set_extractor()`/`set_backend()`/
+> `set_search_strategy()` 在代码中均不存在，照此示例调用会抛 AttributeError/
+> TypeError。当前可用入口：`NexusCore.write()` / `NexusCore.search()` /
+> `nexus_cli.py`。
 
 ### 1. 批量写入
 

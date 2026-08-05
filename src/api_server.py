@@ -80,6 +80,10 @@ class KnowledgeResponse(BaseModel):
     score: Optional[float] = None
 
 
+# layer → confidence 映射（schema 无 confidence 列，按层近似）
+_LAYER_CONFIDENCE = {"instant": 0.40, "candidate": 0.70, "consolidated": 0.90}
+
+
 class StatsResponse(BaseModel):
     """统计响应"""
     total_entries: int
@@ -170,7 +174,7 @@ async def health_check():
 
             # Count entries
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM knowledge")
+            cursor.execute("SELECT COUNT(*) FROM unified_knowledge")
             checks["total_entries"] = cursor.fetchone()[0]
 
             conn.close()
@@ -200,6 +204,7 @@ async def write_knowledge(knowledge: KnowledgeWrite):
 
     result = nexus.write(
         content=knowledge.content,
+        source_session_id=knowledge.source,
         user_id=knowledge.user_id,
         initial_confidence=knowledge.confidence,
     )
@@ -233,18 +238,23 @@ async def search_knowledge(
     else:
         results = nexus.search(query=query, user_id=user_id, limit=limit)
 
-    return [
-        KnowledgeResponse(
+    # search 结果无 source/created_at 列，source 恒 unknown；domain 由 domain_scores 主导域推断
+    layer_conf = _LAYER_CONFIDENCE
+
+    def _map(r: Dict) -> KnowledgeResponse:
+        ds = r.get("domain_scores") or {}
+        domain = max(ds, key=ds.get) if ds else "general"
+        return KnowledgeResponse(
             id=r.get("id", 0),
             content=r.get("content", ""),
-            source=r.get("source", ""),
-            confidence=r.get("confidence", 0),
-            domain=r.get("domain", "general"),
+            source=r.get("source", "") or "unknown",
+            confidence=layer_conf.get(r.get("layer", ""), 0.40),
+            domain=domain,
             created_at=r.get("created_at", ""),
-            score=r.get("score"),
+            score=r.get("rerank_score") or r.get("score"),
         )
-        for r in results
-    ]
+
+    return [_map(r) for r in results]
 
 
 @app.get("/knowledge/{knowledge_id}", response_model=KnowledgeResponse, tags=["知识"])
@@ -275,7 +285,7 @@ async def get_knowledge(knowledge_id: int):
     except (json.JSONDecodeError, TypeError):
         domain_scores = {}
     domain = max(domain_scores, key=domain_scores.get) if domain_scores else "general"
-    layer_conf = {"instant": 0.40, "candidate": 0.70, "consolidated": 0.90}
+    layer_conf = _LAYER_CONFIDENCE
 
     return KnowledgeResponse(
         id=row[0],
@@ -299,16 +309,16 @@ async def get_stats():
     cursor = conn.cursor()
 
     # 总条目数
-    cursor.execute("SELECT COUNT(*) FROM knowledge")
+    cursor.execute("SELECT COUNT(*) FROM unified_knowledge")
     total_entries = cursor.fetchone()[0]
 
     # 按来源统计
-    cursor.execute("SELECT source, COUNT(*) FROM knowledge GROUP BY source")
-    by_source = dict(cursor.fetchall())
+    cursor.execute("SELECT source_session_id, COUNT(*) FROM unified_knowledge GROUP BY source_session_id")
+    by_source = {k or "unknown": v for k, v in cursor.fetchall()}
 
-    # 按域统计
-    cursor.execute("SELECT domain, COUNT(*) FROM knowledge GROUP BY domain")
-    by_domain = dict(cursor.fetchall())
+    # 按域统计（主导域用 last_query_domain 列）
+    cursor.execute("SELECT last_query_domain, COUNT(*) FROM unified_knowledge GROUP BY last_query_domain")
+    by_domain = {k or "unknown": v for k, v in cursor.fetchall()}
 
     conn.close()
 

@@ -42,10 +42,10 @@ When using Nexus Memory:
 Nexus Memory includes built-in threat detection:
 
 - **Prompt Injection**: 6 patterns detected (context scope)
-- **SQL Injection**: 7 patterns detected (input scope)
+- **SQL Injection**: 4 patterns detected (input scope)
 - **XSS**: 3 patterns detected (input scope)
 
-Total: 16 threat patterns with 2-tier scope control (context / input)
+Total: 13 threat patterns with 2-tier scope control (context / input)
 
 ## Credits
 

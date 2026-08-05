@@ -42,8 +42,8 @@ class BaseIntegration:
         """保存对话上下文"""
         self.nexus.write(
             content=f"User: {input_text}\nAssistant: {output_text}",
-            source="conversation",
-            confidence=0.7,
+            source_session_id="conversation",
+            initial_confidence=0.7,
         )
 
     def load_memory_variables(self, query: str) -> Dict:
@@ -89,8 +89,8 @@ class LangChainIntegration(BaseIntegration):
                 output_text = outputs.get("output", "")
                 self.nexus.write(
                     content=f"User: {input_text}\nAssistant: {output_text}",
-                    source="langchain_conversation",
-                    confidence=0.7,
+                    source_session_id="langchain_conversation",
+                    initial_confidence=0.7,
                 )
 
             def clear(self) -> None:
@@ -166,8 +166,8 @@ class LlamaIndexIntegration(BaseIntegration):
             def save_memory(self, key: str, memory: str):
                 self.nexus.write(
                     content=memory,
-                    source="llamaindex_conversation",
-                    confidence=0.7,
+                    source_session_id="llamaindex_conversation",
+                    initial_confidence=0.7,
                 )
 
             def reset(self):
@@ -242,8 +242,8 @@ class AutoGenIntegration(BaseIntegration):
                 self.messages.append(message)
                 self.nexus.write(
                     content=json.dumps(message),
-                    source="autogen_conversation",
-                    confidence=0.7,
+                    source_session_id="autogen_conversation",
+                    initial_confidence=0.7,
                 )
 
             def get(self, limit: int = 10) -> List[Dict]:
@@ -279,9 +279,8 @@ class ClaudeCodeIntegration(BaseIntegration):
                 """记住事实"""
                 self.nexus.write(
                     content=fact,
-                    source="claude_code",
-                    confidence=0.9,
-                    domain=category,
+                    source_session_id="claude_code",
+                    initial_confidence=0.9,
                 )
 
             def recall(self, query: str, limit: int = 5) -> List[str]:

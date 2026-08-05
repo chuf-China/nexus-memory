@@ -291,7 +291,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 3-layer knowledge architecture (Memory → Session → Nexus)
 - 6-domain scoring system (Freshness/Importance/Frequency/Relevance/Confidence/Feedback)
 - Hybrid search engine (FTS5 + Vector + Graph)
-- Threat pattern detection with 3-tier scope control (16 类模式: 6 提示注入 + 7 SQLi + 3 XSS)
+- Threat pattern detection with 3-tier scope control (更正：实际 13 类模式: 6 提示注入 + 4 SQLi + 3 XSS，2 层作用域)
 - Self-evolution mechanism with auto-classification and immune rules
 - CLI tool for direct interaction
 - Comprehensive test suite
