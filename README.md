@@ -213,6 +213,34 @@ nexus-memory/
 └── README.md                  # This file
 ```
 
+## Benchmark
+
+Full LoCoMo evaluation via the [memory-benchmarks](https://github.com/mem0ai/memory-benchmarks) framework — 10 long-term conversations, **1,540 questions** across 4 categories. Ingest ran as pure raw-chunk writes (**zero LLM calls**); answerer and judge: `deepseek-v4-flash`.
+
+| Category | Questions | Accuracy |
+|----------|-----------|----------|
+| **Overall** | **1,540** | **76.2%** (1,173/1,540) |
+| Single-hop | 841 | 88.1% |
+| Multi-hop | 282 | 84.0% |
+| Open-domain | 96 | 66.7% |
+| Temporal | 321 | 40.8% |
+
+- Zero empty answers across the full run
+- Retrieval (hybrid mode, 200 results/query): **p50 131ms**, p90 142ms
+- Reference: mem0 platform reports 92.5% on the same benchmark (third-party result; LLM-distilled ingest)
+
+**Known gap — temporal reasoning (40.8%)**: ingest stores raw chunks verbatim, so relative time words ("last week") are never normalized to absolute dates, leaving the answerer without a resolvable timestamp. Ingest-side time normalization is the next planned fix.
+
+### Benchmark switches
+
+High-concurrency eval runs can skip optional heavy stages via environment variables:
+
+| Variable | Effect |
+|----------|--------|
+| `NEXUS_NO_RERANK=1` | Skip cross-encoder reranking (10-20x per-search slowdown under 10+ concurrent searches) |
+| `NEXUS_NO_GRAPH=1` | Skip entity-graph traversal (recursive CTE on hub nodes can take 10s+ at 10k+ relations) |
+| `NEXUS_EVAL_DB=/path` | Override the eval database path |
+
 ## Dependencies
 
 **Core (required):**

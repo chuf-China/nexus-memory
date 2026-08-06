@@ -143,6 +143,34 @@ Nexus 内置 13 类威胁模式检测（`src/security.py`）：
 | 图关系查询 | 8.6ms | 实体关系遍历 |
 | 时间感知检索 | 19.7ms | 时间词解析 + 多跳 |
 
+## LoCoMo 评测基准
+
+基于 [memory-benchmarks](https://github.com/mem0ai/memory-benchmarks) 框架的全量端到端评测（区别于上表单次微基准）：10 段长对话、**1,540 道题**、4 个类别。ingest 为纯 raw chunk 写入（**零 LLM 调用**）；answerer/judge 使用 `deepseek-v4-flash`。
+
+| 类别 | 题数 | 准确率 |
+|------|------|--------|
+| **总体** | **1,540** | **76.2%**（1,173/1,540） |
+| Single-hop | 841 | 88.1% |
+| Multi-hop | 282 | 84.0% |
+| Open-domain | 96 | 66.7% |
+| Temporal | 321 | 40.8% |
+
+- 全量运行零空答案
+- 检索（hybrid 模式，200 results/query）：p50 **131ms**，p90 142ms
+- 参照：mem0 平台同基准 92.5%（第三方结果，LLM 蒸馏式 ingest）
+
+**已知短板 — 时间推理（40.8%）**：ingest 原样存储 raw chunk，"last week" 等相对时间词未归一化为绝对日期，answerer 无法解析时间戳。计划修复方向：ingest 侧时间归一化。
+
+### 评测开关
+
+高并发评测可用环境变量跳过可选重阶段：
+
+| 变量 | 作用 |
+|------|------|
+| `NEXUS_NO_RERANK=1` | 跳过 cross-encoder 重排（10+ 并发下单次 search 慢 10-20 倍） |
+| `NEXUS_NO_GRAPH=1` | 跳过图遍历（万级关系表上 hub 节点递归 CTE 10s+） |
+| `NEXUS_EVAL_DB=/path` | 覆盖评测数据库路径 |
+
 ## 依赖
 
 - Python 3.9+
