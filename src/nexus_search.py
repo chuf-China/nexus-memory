@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -271,14 +272,17 @@ class EnhancedSearch:
         all_results.sort(key=lambda x: -x.get("rerank_score", 0))
 
         # 如果有 cross-encoder，用原 query 做最终重排
-        try:
-            from .nexus_embedder import get_reranker
-            reranker = get_reranker()
-            reranker._load_cross_encoder()
-            if reranker._model and reranker._model != "score_only":
-                all_results = reranker.rerank(query, all_results, top_k=limit * 3)
-        except Exception:
-            pass
+        # NEXUS_NO_RERANK=1 跳过：cross-encoder 对 limit*3 条逐条 ONNX 推理，
+        # 高并发（10+ search/轮）下争抢线程池使单次 search 慢 10-20 倍
+        if not os.environ.get("NEXUS_NO_RERANK"):
+            try:
+                from .nexus_embedder import get_reranker
+                reranker = get_reranker()
+                reranker._load_cross_encoder()
+                if reranker._model and reranker._model != "score_only":
+                    all_results = reranker.rerank(query, all_results, top_k=limit * 3)
+            except Exception:
+                pass
 
         return all_results[:limit * 3]
 

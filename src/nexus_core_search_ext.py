@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -69,19 +70,22 @@ class SearchExtMixin:
                 results.extend(semantic_results)
 
         if mode in ("graph", "hybrid"):
-            try:
-                from .nexus_graph import EntityGraph
-                eg = EntityGraph(self._conn())
-                graph_results = eg.search_by_graph(query, limit=limit * 2)
-                for r in graph_results:
-                    r["_source"] = "graph"
-                    # graph results use entry_id; normalize to id for
-                    # downstream consumers (_update_domain_scores etc.)
-                    if "id" not in r and "entry_id" in r:
-                        r["id"] = r["entry_id"]
-                results.extend(graph_results)
-            except Exception:
-                pass
+            # NEXUS_NO_GRAPH=1 跳过：人名等 hub 节点在万级关系表上
+            # 递归 CTE 遍历 10s+，并发下锁竞争可冻结事件循环数分钟
+            if not os.environ.get("NEXUS_NO_GRAPH"):
+                try:
+                    from .nexus_graph import EntityGraph
+                    eg = EntityGraph(self._conn())
+                    graph_results = eg.search_by_graph(query, limit=limit * 2)
+                    for r in graph_results:
+                        r["_source"] = "graph"
+                        # graph results use entry_id; normalize to id for
+                        # downstream consumers (_update_domain_scores etc.)
+                        if "id" not in r and "entry_id" in r:
+                            r["id"] = r["entry_id"]
+                    results.extend(graph_results)
+                except Exception:
+                    pass
 
         if mode == "fts" or (mode in ("hybrid", "semantic") and not results):
             # FTS5 search always available as fallback
@@ -302,16 +306,19 @@ class SearchExtMixin:
         self._update_domain_scores(results, user_id)
 
         # ── Rerank: cross-encoder + score fusion ──────────
-        try:
-            from .nexus_embedder import get_reranker
-            # 结果数 ≤ limit 时无物可裁剪，跳过 cross-encoder 推理
-            # （~8ms/次，占单路 FTS 搜索 99% 耗时；bm25 已排序）
-            results = get_reranker().rerank(
-                query, results, top_k=limit,
-                use_cross_encoder=len(results) > limit
-            )
-        except Exception:
-            pass
+        # NEXUS_NO_RERANK=1 跳过：高并发（10+ search/轮）下 cross-encoder
+        # 争抢 ONNX 线程池，单次 search 慢 10-20 倍（benchmark 场景用）
+        if not os.environ.get("NEXUS_NO_RERANK"):
+            try:
+                from .nexus_embedder import get_reranker
+                # 结果数 ≤ limit 时无物可裁剪，跳过 cross-encoder 推理
+                # （~8ms/次，占单路 FTS 搜索 99% 耗时；bm25 已排序）
+                results = get_reranker().rerank(
+                    query, results, top_k=limit,
+                    use_cross_encoder=len(results) > limit
+                )
+            except Exception:
+                pass
 
         # ── Auto record domain hit (top 3) ──────────────
         # 批量写入：record_domain_hit 单次调用自带 commit，搜索路径
